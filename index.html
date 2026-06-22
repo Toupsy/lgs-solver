@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schnitt zweier Ebenen (Parameterform)</title>
+<style>
+  :root { --blau:#4a90d9; --blaudk:#1c5a96; --rot:#d9534f; --rotdk:#9c2b27;
+          --gruen:#1a7d33; --bg:#f4f4f4; --karte:#fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Segoe UI",system-ui,sans-serif; background:var(--bg); color:#222; }
+  h1 { font-size:1.2rem; margin:0 0 .6rem; }
+  .wrap { display:flex; gap:16px; padding:16px; flex-wrap:wrap; align-items:flex-start; }
+  .panel { background:var(--karte); border-radius:10px; padding:14px 16px;
+           box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .inputs { width:300px; flex:0 0 auto; }
+  .right { flex:1 1 460px; min-width:340px; }
+  .eq-title { font-weight:600; margin:.6rem 0 .3rem; }
+  .eq-title.e1 { color:var(--blaudk); } .eq-title.e2 { color:var(--rotdk); }
+  .vrow { display:grid; grid-template-columns:120px repeat(3,1fr); gap:6px;
+          align-items:center; margin-bottom:6px; }
+  .vrow label { font-size:.9rem; }
+  .vrow input { width:100%; padding:5px; text-align:center; border:1px solid #ccc;
+                border-radius:5px; font-size:.95rem; }
+  .hint { color:#888; font-size:.8rem; margin:.4rem 0 0; }
+  button { border:none; border-radius:6px; padding:8px 12px; cursor:pointer;
+           font-size:.9rem; }
+  .primary { background:var(--blau); color:#fff; }
+  .go { background:var(--gruen); color:#fff; }
+  .ghost { background:#e6e6e6; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .helpbar { display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+  .tabs { display:flex; gap:4px; margin-bottom:10px; }
+  .tab { padding:7px 14px; border-radius:8px 8px 0 0; background:#e6e6e6; cursor:pointer; }
+  .tab.active { background:var(--karte); font-weight:600; box-shadow:0 -1px 3px rgba(0,0,0,.06); }
+  #steps { font-size:.95rem; line-height:1.4; max-height:62vh; overflow:auto; }
+  .s-head { font-weight:700; color:var(--blaudk); margin:.9rem 0 .3rem; }
+  .s-text { white-space:pre-wrap; margin:.2rem 0; }
+  .s-mat  { font-family:"Consolas",ui-monospace,monospace; background:#f0f4f8;
+            padding:6px 10px; border-radius:6px; white-space:pre; overflow-x:auto; margin:.3rem 0; }
+  .s-res  { font-family:"Consolas",ui-monospace,monospace; font-weight:700; color:var(--gruen);
+            background:#eaf7ec; padding:8px 10px; border-radius:6px; white-space:pre-wrap; margin:.4rem 0; }
+  canvas { width:100%; max-width:560px; height:440px; background:#fff; border-radius:8px;
+           touch-action:none; cursor:grab; display:block; }
+  canvas.grabbing { cursor:grabbing; }
+  .canvas-hint { color:#888; font-size:.8rem; margin-top:6px; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel inputs">
+    <h1>Schnitt zweier Ebenen</h1>
+    <div class="eq-title e1">E1:  x = P + s·a + t·b</div>
+    <div class="vrow"><label>P (Stütze)</label><input id="P0"><input id="P1"><input id="P2"></div>
+    <div class="vrow"><label>a (Richtung 1)</label><input id="a0"><input id="a1"><input id="a2"></div>
+    <div class="vrow"><label>b (Richtung 2)</label><input id="b0"><input id="b1"><input id="b2"></div>
+    <div class="eq-title e2">E2:  x = Q + u·c + v·d</div>
+    <div class="vrow"><label>Q (Stütze)</label><input id="Q0"><input id="Q1"><input id="Q2"></div>
+    <div class="vrow"><label>c (Richtung 1)</label><input id="c0"><input id="c1"><input id="c2"></div>
+    <div class="vrow"><label>d (Richtung 2)</label><input id="d0"><input id="d1"><input id="d2"></div>
+    <p class="hint">Ganze Zahlen oder Brüche wie 1/2 (Dezimal mit . oder , geht auch).</p>
+    <div class="btns">
+      <button class="primary" id="solveBtn">Lösen</button>
+      <button class="ghost" id="exBtn">Beispiel laden</button>
+    </div>
+    <div class="helpbar">
+      <label><input type="checkbox" id="helpMode" checked> Hilfe-Modus (Schritte einzeln)</label>
+    </div>
+    <div class="helpbar">
+      <button class="go" id="nextBtn">Nächster Schritt</button>
+      <button class="ghost" id="allBtn">Alles zeigen</button>
+    </div>
+  </div>
+
+  <div class="panel right">
+    <div class="tabs">
+      <div class="tab active" data-tab="steps">Rechenweg</div>
+      <div class="tab" data-tab="view3d">3D-Ansicht</div>
+    </div>
+    <div id="steps"></div>
+    <div id="view3d" class="hidden">
+      <canvas id="cv" width="560" height="440"></canvas>
+      <div class="canvas-hint">Mit Maus ziehen (oder Finger wischen) zum Drehen. Scrollen/Pinch zum Zoomen.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- exakte Bruchrechnung (BigInt) ---------- */
+function bgcd(a,b){ a=a<0n?-a:a; b=b<0n?-b:b; while(b){ [a,b]=[b,a%b]; } return a; }
+class Frac {
+  constructor(n, d=1n){
+    if(d===0n) throw new Error("div0");
+    if(d<0n){ n=-n; d=-d; }
+    const g = bgcd(n,d) || 1n;
+    this.n = n/g; this.d = d/g;
+  }
+  static parse(str){
+    let s = String(str).trim().replace(/\s+/g,"");
+    if(s==="") throw new Error("leer");
+    if(s.includes("/")){ const [a,b]=s.split("/"); return Frac.dec(a).div(Frac.dec(b)); }
+    return Frac.dec(s);
+  }
+  static dec(s){
+    s = s.replace(",", ".");
+    let neg = s.startsWith("-"); if(neg||s.startsWith("+")) s=s.slice(1);
+    if(s==="") throw new Error("leer");
+    if(s.includes(".")){ const [i,f]=s.split("."); const num=BigInt((i||"0")+(f||""));
+      const den=10n**BigInt((f||"").length); return new Frac(neg?-num:num, den); }
+    const num=BigInt(s); return new Frac(neg?-num:num, 1n);
+  }
+  add(o){ return new Frac(this.n*o.d + o.n*this.d, this.d*o.d); }
+  sub(o){ return new Frac(this.n*o.d - o.n*this.d, this.d*o.d); }
+  mul(o){ return new Frac(this.n*o.n, this.d*o.d); }
+  div(o){ return new Frac(this.n*o.d, this.d*o.n); }
+  neg(){ return new Frac(-this.n, this.d); }
+  isZero(){ return this.n===0n; }
+  eq(o){ return this.n===o.n && this.d===o.d; }
+  gt0(){ return this.n>0n; }
+  num(){ return Number(this.n)/Number(this.d); }
+  toString(){ return this.d===1n ? this.n.toString() : `${this.n}/${this.d}`; }
+}
+const F0 = new Frac(0n), F1 = new Frac(1n);
+const Fi = (x)=> new Frac(BigInt(x));
+
+/* ---------- Formatierung ---------- */
+const fmt = f => f.toString();
+const fmtVec = v => "(" + v.map(fmt).join("; ") + ")";
+function fmtMatrix(M){
+  const lab=["s","t","u","v",""];
+  const S = M.map(r=>r.map(fmt));
+  const w = lab.map((_,j)=> Math.max(...S.map(r=>r[j].length), lab[j].length));
+  const head = "    " + lab.map((l,j)=>l.padStart(w[j])).slice(0,4).join("   ");
+  const out=[head];
+  for(const r of S){
+    const body = r.slice(0,4).map((x,j)=>x.padStart(w[j])).join("   ");
+    out.push(` [ ${body} | ${r[4].padStart(w[4])} ]`);
+  }
+  return out.join("\n");
+}
+function multerm(k, name, lead=false){
+  let s;
+  if(k.eq(F1)) s=name;
+  else if(k.eq(F1.neg())) s="-"+name;
+  else s=`${fmt(k)}*${name}`;
+  if(lead) return (k.gt0()? "+ ":"- ") + (s.startsWith("-")?s.slice(1):s);
+  return s;
+}
+function exprStr(e){ // e=[const, rFaktor]
+  const [cst,r]=e;
+  if(r.isZero()) return fmt(cst);
+  const ra = r.gt0()? r : r.neg();
+  const rmag = ra.eq(F1) ? "r" : `${fmt(ra)}*r`;
+  if(cst.isZero()) return (r.gt0()?"":"-")+rmag;
+  return `${fmt(cst)} ${r.gt0()?"+":"-"} ${rmag}`;
+}
+
+/* ---------- Vektor-Helfer ---------- */
+const vsub=(a,b)=>a.map((x,i)=>x.sub(b[i]));
+function rowGcd(row){ // ggT, 0 falls nicht ganzzahlig
+  let g=0n;
+  for(const x of row){ if(x.d!==1n) return 0n; g=bgcd(g, x.n<0n?-x.n:x.n); }
+  return g;
+}
+function cleanDir(v){
+  let L=1n; for(const x of v) L = L/bgcd(L,x.d)*x.d;
+  let ints = v.map(x=> x.n*(L/x.d));
+  let g=0n; for(const n of ints) g=bgcd(g, n<0n?-n:n);
+  if(g>0n) ints=ints.map(n=>n/g);
+  for(const n of ints){ if(n!==0n){ if(n<0n) ints=ints.map(m=>-m); break; } }
+  return ints.map(n=>new Frac(n,1n));
+}
+
+/* ---------- Löser mit Protokoll ---------- */
+function solve(P,a,b,Q,c,d){
+  const steps=[]; const add=(kind,text)=>steps.push({kind,text});
+  const geo={type:"none", planes:{P,a,b,Q,c,d}};
+
+  add("head","Aufgabe");
+  add("text",`E1:  x = ${fmtVec(P)} + s*${fmtVec(a)} + t*${fmtVec(b)}\n`+
+             `E2:  x = ${fmtVec(Q)} + u*${fmtVec(c)} + v*${fmtVec(d)}`);
+  add("head","Schritt 1 – Ebenen gleichsetzen");
+  add("text","P + s*a + t*b = Q + u*c + v*d\n"+
+             "Unbekannte nach links, Konstanten nach rechts:\n"+
+             "   s*a + t*b - u*c - v*d = Q - P\n"+
+             `Q - P = ${fmtVec(Q)} - ${fmtVec(P)} = ${fmtVec(vsub(Q,P))}`);
+
+  let M=[0,1,2].map(i=>[a[i],b[i],c[i].neg(),d[i].neg(),Q[i].sub(P[i])]);
+  add("head","Schritt 2 – Gleichungssystem (3 Gleichungen, Unbekannte s,t,u,v)");
+  add("text","Spalten = Koeffizienten von s, t, u, v ; rechts die Konstante:");
+  add("mat",fmtMatrix(M));
+
+  add("head","Schritt 3 – Variablen eliminieren (Additionsverfahren)");
+  add("text","Wir kombinieren ganze Gleichungen, sodass je eine Variable wegfällt.\n"+
+             "Nur ganzzahlige Vielfache, kein Teilen, keine Pivotsuche.");
+
+  const names=["s","t","u","v"]; const lead=[]; let srow=0;
+  for(let col=0; col<4; col++){
+    let r=-1; for(let i=srow;i<3;i++){ if(!M[i][col].isZero()){ r=i; break; } }
+    if(r<0) continue;
+    if(r!==srow){ [M[srow],M[r]]=[M[r],M[srow]];
+      add("text",`Gl.${srow+1} und Gl.${r+1} tauschen, damit '${names[col]}' in Gl.${srow+1} vorkommt:`);
+      add("mat",fmtMatrix(M)); }
+    for(let i=srow+1;i<3;i++){
+      if(!M[i][col].isZero()){
+        const n=M[srow][col], m=M[i][col];
+        M[i]=M[i].map((x,k)=> n.mul(M[i][k]).sub(m.mul(M[srow][k])));
+        add("text",`Gl.${i+1} := ${multerm(n,`Gl.${i+1}`)} ${multerm(m.neg(),`Gl.${srow+1}`,true)}   => '${names[col]}' fällt weg`);
+        const g=rowGcd(M[i]);
+        if(g>1n){ M[i]=M[i].map(x=>x.div(new Frac(g,1n))); add("text",`Gl.${i+1} durch ${g} kürzen.`); }
+        add("mat",fmtMatrix(M));
+      }
+    }
+    lead.push([col,srow]); srow++; if(srow===3) break;
+  }
+  add("text","Umgeformtes System (Stufenform):");
+  add("mat",fmtMatrix(M));
+
+  for(let i=0;i<3;i++){
+    if(M[i].slice(0,4).every(x=>x.isZero()) && !M[i][4].isZero()){
+      add("head","Ergebnis");
+      add("res",`Gl.${i+1} ergibt 0 = ${fmt(M[i][4])}  ->  Widerspruch.\nDie Ebenen sind echt parallel, es gibt KEINEN Schnitt.`);
+      return {steps,geo};
+    }
+  }
+
+  const leadCols=lead.map(x=>x[0]);
+  const free=[0,1,2,3].filter(j=>!leadCols.includes(j));
+
+  function backSub(){
+    const sol={}; for(const j of free) sol[j]=[F0,F1];
+    for(let k=lead.length-1;k>=0;k--){
+      const [col,row]=lead[k]; const pv=M[row][col];
+      let acc=[M[row][4],F0];
+      for(let j=0;j<4;j++){ if(j!==col && !M[row][j].isZero()){
+        const xj=sol[j]; acc=[acc[0].sub(M[row][j].mul(xj[0])), acc[1].sub(M[row][j].mul(xj[1]))]; } }
+      sol[col]=[acc[0].div(pv), acc[1].div(pv)];
+      add("text",`Gl.${row+1} nach '${names[col]}' auflösen:  ${names[col]} = ${exprStr(sol[col])}`);
+    }
+    return [0,1,2,3].map(j=>sol[j]);
+  }
+
+  if(free.length===0){
+    const sol=backSub(); const s0=sol[0][0], t0=sol[1][0];
+    const pt=[0,1,2].map(i=>P[i].add(s0.mul(a[i])).add(t0.mul(b[i])));
+    add("head","Schritt 5 – in E1 einsetzen");
+    add("text",`x = P + s*a + t*b  mit s = ${fmt(s0)}, t = ${fmt(t0)}\nx = ${fmtVec(pt)}`);
+    add("head","Ergebnis"); add("res",`Genau ein gemeinsamer Punkt:  ${fmtVec(pt)}`);
+    geo.type="point"; geo.point=pt.map(x=>x.num());
+    return {steps,geo};
+  }
+  if(free.length>=2){
+    add("head","Ergebnis"); add("res","Zwei freie Parameter -> die Ebenen sind identisch (ganze Ebene).");
+    geo.type="plane"; return {steps,geo};
+  }
+
+  const fv=free[0];
+  add("head","Schritt 4 – rückwärts einsetzen");
+  add("text",`'${names[fv]}' wird von keiner Gleichung gebunden -> frei wählbar.\n`+
+             `Setze '${names[fv]}' = r. Jede andere Variable: [Konstante] + [Faktor]*r.`);
+  const sol=backSub();
+  add("text","Zusammengefasst:\n"+
+             `   s = ${exprStr(sol[0])}\n   t = ${exprStr(sol[1])}\n`+
+             `   u = ${exprStr(sol[2])}\n   v = ${exprStr(sol[3])}`);
+  const stuetz=[0,1,2].map(i=>P[i].add(sol[0][0].mul(a[i])).add(sol[1][0].mul(b[i])));
+  const richtung=[0,1,2].map(i=>sol[0][1].mul(a[i]).add(sol[1][1].mul(b[i])));
+  const rc=cleanDir(richtung);
+  add("head","Schritt 5 – in E1 einsetzen");
+  add("text","x = P + s*a + t*b , s und t durch r ersetzen:\n"+
+             `Stützvektor (r=0):       ${fmtVec(stuetz)}\n`+
+             `Richtung (Faktor vor r): ${fmtVec(richtung)}  ->  gekürzt ${fmtVec(rc)}`);
+  add("head","Ergebnis – Schnittgerade");
+  add("res",`g:  x = ${fmtVec(stuetz)} + r * ${fmtVec(rc)}`);
+  geo.type="line"; geo.stuetz=stuetz.map(x=>x.num()); geo.richtung=rc.map(x=>x.num());
+  return {steps,geo};
+}
+
+/* ---------- UI ---------- */
+const $=id=>document.getElementById(id);
+const keys=["P","a","b","Q","c","d"];
+function readVec(k){ return [0,1,2].map(i=>Frac.parse($(k+i).value)); }
+function setEx(){
+  const ex={P:[1,1,-1],a:[1,0,2],b:[0,2,0],Q:[0,-1,1],c:[-1,2,-1],d:[-1,4,2]};
+  for(const k of keys) ex[k].forEach((v,i)=> $(k+i).value=v);
+}
+
+const state={steps:[],shown:0,geo:null};
+
+function render(){
+  const el=$("steps"); el.innerHTML="";
+  const n=state.steps.length;
+  state.steps.slice(0,state.shown).forEach(s=>{
+    const div=document.createElement("div");
+    div.className = s.kind==="head"?"s-head":s.kind==="mat"?"s-mat":s.kind==="res"?"s-res":"s-text";
+    div.textContent=s.text; el.appendChild(div);
+  });
+  el.scrollTop=el.scrollHeight;
+  const done=state.shown>=n;
+  $("nextBtn").disabled=done;
+  $("nextBtn").textContent = done? "Fertig ✓" : `Nächster Schritt (${state.shown}/${n})`;
+  if(done && state.geo){ geo3d=state.geo; drawGeo(); }
+  else { geo3d=null; drawPlaceholder(); }
+}
+function doSolve(){
+  let P,a,b,Q,c,d;
+  try{ P=readVec("P");a=readVec("a");b=readVec("b");Q=readVec("Q");c=readVec("c");d=readVec("d"); }
+  catch(e){ alert("Bitte alle 18 Felder ausfüllen (z.B. 1, -2, 1/2)."); return; }
+  const {steps,geo}=solve(P,a,b,Q,c,d);
+  state.steps=steps; state.geo=geo;
+  state.shown = $("helpMode").checked ? 0 : steps.length;
+  render();
+}
+$("solveBtn").onclick=doSolve;
+$("exBtn").onclick=()=>{ setEx(); doSolve(); };
+$("helpMode").onchange=doSolve;
+$("nextBtn").onclick=()=>{ if(state.shown<state.steps.length){ state.shown++; render(); } };
+$("allBtn").onclick=()=>{ state.shown=state.steps.length; render(); };
+
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  const tab=t.dataset.tab;
+  $("steps").classList.toggle("hidden", tab!=="steps");
+  $("view3d").classList.toggle("hidden", tab!=="view3d");
+  if(tab==="view3d") render();
+});
+
+/* ---------- 3D: drehbar ---------- */
+const cv=$("cv"), ctx=cv.getContext("2d");
+let yaw=-0.6, pitch=-0.5, zoom=1, geo3d=null;
+const norm=(v,L)=>{ const n=Math.hypot(...v)||1; return v.map(c=>c/n*L); };
+
+function drawPlaceholder(){
+  fitCanvas(); ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle="#999"; ctx.font="15px Segoe UI"; ctx.textAlign="center";
+  ctx.fillText("3D-Ansicht erscheint, sobald alle Schritte aufgedeckt sind.", cv.width/2, cv.height/2);
+}
+function fitCanvas(){
+  const r=cv.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  cv.width=r.width*dpr; cv.height=r.height*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+  cv._w=r.width; cv._h=r.height;
+}
+function rot(p){
+  let [x,y,z]=p, ca=Math.cos(yaw),sa=Math.sin(yaw);
+  let x1=x*ca+z*sa, z1=-x*sa+z*ca, y1=y;
+  let cb=Math.cos(pitch),sb=Math.sin(pitch);
+  return [x1, y1*cb - z1*sb, y1*sb + z1*cb];
+}
+function drawGeo(){
+  if(!geo3d){ drawPlaceholder(); return; }
+  fitCanvas();
+  const W=cv._w, H=cv._h;
+  ctx.clearRect(0,0,W,H);
+  const {P,a,b,Q,c,d}=geo3d.planes;
+  const fl=v=>v.map(x=>x.num());
+  const Pf=fl(P),af=fl(a),bf=fl(b),Qf=fl(Q),cf=fl(c),df=fl(d);
+  const S=4;
+  const corners=(m,d1,d2)=>{ const u1=norm(d1,S),u2=norm(d2,S);
+    return [[-1,-1],[1,-1],[1,1],[-1,1]].map(([i,j])=>m.map((_,k)=>m[k]+i*u1[k]+j*u2[k])); };
+  let f1,f2;
+  if(geo3d.type==="line"){ f1=f2=geo3d.stuetz; }
+  else if(geo3d.type==="point"){ f1=f2=geo3d.point; }
+  else { f1=Pf; f2=Qf; }
+  const poly1=corners(f1,af,bf), poly2=corners(f2,cf,df);
+  let pts=[...poly1,...poly2], line=null;
+  if(geo3d.type==="line"){ const dn=norm(geo3d.richtung,S+1.5), s=geo3d.stuetz;
+    line=[s.map((_,k)=>s[k]-dn[k]), s.map((_,k)=>s[k]+dn[k])]; pts=pts.concat(line); }
+  else if(geo3d.type==="point"){ pts.push(geo3d.point); }
+
+  // Schwerpunkt als Drehzentrum
+  const ctr=[0,1,2].map(k=> pts.reduce((s,p)=>s+p[k],0)/pts.length);
+  const R=p=> rot(p.map((_,k)=>p[k]-ctr[k]));
+  const rp=pts.map(R);
+  const xs=rp.map(p=>p[0]), ys=rp.map(p=>-p[1]);
+  const minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
+  const m=30, k=Math.min((W-2*m)/((maxx-minx)||1),(H-2*m)/((maxy-miny)||1))*zoom;
+  const cx=W/2, cy=H/2, mx=(minx+maxx)/2, my=(miny+maxy)/2;
+  const proj=p=>{ const q=R(p); return [cx+(q[0]-mx)*k, cy+(-q[1]-my)*k]; };
+  const meanZ=poly=>poly.reduce((s,p)=>s+R(p)[2],0)/poly.length;
+
+  const planes=[{poly:poly1,fill:"rgba(74,144,217,.5)",stroke:"#1c5a96"},
+                {poly:poly2,fill:"rgba(217,83,79,.5)",stroke:"#9c2b27"}];
+  planes.sort((A,B)=>meanZ(B.poly)-meanZ(A.poly)); // hinten zuerst
+  for(const pl of planes){
+    ctx.beginPath();
+    pl.poly.forEach((p,i)=>{ const [x,y]=proj(p); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    ctx.closePath(); ctx.fillStyle=pl.fill; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle=pl.stroke; ctx.stroke();
+  }
+  if(line){
+    const [x1,y1]=proj(line[0]), [x2,y2]=proj(line[1]);
+    ctx.lineCap="round";
+    ctx.strokeStyle="#fff"; ctx.lineWidth=7; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.strokeStyle="#1a7d33"; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    const [sx,sy]=proj(geo3d.stuetz);
+    ctx.fillStyle="#1a7d33"; ctx.beginPath(); ctx.arc(sx,sy,5,0,7); ctx.fill();
+    ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke();
+  } else if(geo3d.type==="point"){
+    const [sx,sy]=proj(geo3d.point);
+    ctx.fillStyle="#f0ad4e"; ctx.beginPath(); ctx.arc(sx,sy,7,0,7); ctx.fill();
+    ctx.strokeStyle="#9c6a13"; ctx.lineWidth=2; ctx.stroke();
+  }
+  // Legende
+  const leg=[["#4a90d9","E1"],["#d9534f","E2"]];
+  if(geo3d.type==="line") leg.push(["#1a7d33","Schnittgerade g"]);
+  else if(geo3d.type==="point") leg.push(["#f0ad4e","Schnittpunkt"]);
+  else if(geo3d.type==="plane") leg.push(["#888","Ebenen identisch"]);
+  else leg.push(["#888","kein Schnitt (parallel)"]);
+  ctx.textAlign="left"; ctx.font="13px Segoe UI";
+  leg.forEach(([col,lab],i)=>{ const y=14+i*20;
+    ctx.fillStyle=col; ctx.fillRect(12,y,16,12);
+    ctx.fillStyle="#222"; ctx.fillText(lab,34,y+11); });
+}
+
+/* Maus / Touch */
+let drag=null;
+cv.addEventListener("pointerdown",e=>{ drag={x:e.clientX,y:e.clientY}; cv.classList.add("grabbing");
+  cv.setPointerCapture(e.pointerId); });
+cv.addEventListener("pointermove",e=>{ if(!drag) return;
+  yaw += (e.clientX-drag.x)*0.01; pitch += (e.clientY-drag.y)*0.01;
+  pitch=Math.max(-1.5,Math.min(1.5,pitch)); drag={x:e.clientX,y:e.clientY};
+  if(geo3d) drawGeo(); });
+cv.addEventListener("pointerup",()=>{ drag=null; cv.classList.remove("grabbing"); });
+cv.addEventListener("wheel",e=>{ e.preventDefault(); zoom*=Math.exp(-e.deltaY*0.001);
+  zoom=Math.max(0.3,Math.min(4,zoom)); if(geo3d) drawGeo(); }, {passive:false});
+window.addEventListener("resize",()=>{ if($("view3d").classList.contains("hidden")) return;
+  geo3d?drawGeo():drawPlaceholder(); });
+
+setEx(); doSolve();
+</script>
+</body>
+</html>

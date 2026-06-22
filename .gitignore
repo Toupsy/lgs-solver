@@ -1,0 +1,9 @@
+# PyInstaller-Build-Artefakte
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc
+
+# Editor/Tooling
+.claude/
