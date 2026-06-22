@@ -1,0 +1,8 @@
+services:
+  lgs-solver:
+    build: .
+    image: lgs-solver
+    container_name: lgs-solver
+    ports:
+      - "8080:80"        # Host-Port 8080 -> hier anpassen, falls belegt
+    restart: unless-stopped

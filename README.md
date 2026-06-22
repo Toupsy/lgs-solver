@@ -22,6 +22,24 @@ Settings → Pages → Branch `main`, Ordner `/ (root)`. Die Seite ist dann unte
 `https://<user>.github.io/<repo>/` erreichbar und kann auf der Homepage verlinkt
 oder per `<iframe>` eingebettet werden.
 
+## Deploy via Portainer (Docker, z.B. auf NAS)
+Die App läuft als winziger nginx-Container.
+
+**Portainer → Stacks → Add stack → Repository:**
+- Repository URL: dieses Git-Repo
+- Compose path: `docker-compose.yml`
+- Deploy
+
+Danach erreichbar unter `http://<nas-ip>:8080/`. Den Host-Port in
+`docker-compose.yml` anpassen, falls 8080 belegt ist.
+
+Alternativ ohne Git (Web editor): den Inhalt von `docker-compose.yml` einfügen –
+Portainer baut das Image dann aus dem `Dockerfile`.
+
+Manuell auf der Kommandozeile:
+
+    docker compose up -d        # baut und startet, Port 8080
+
 ## Desktop-Variante (optional)
 `ebenen_schnitt_gui.py` ist eine eigenständige tkinter-App (gleiche Funktionen).
 Eine `.exe` lässt sich damit bauen:
