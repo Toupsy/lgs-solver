@@ -30,15 +30,15 @@ Die App läuft als winziger nginx-Container.
 - Compose path: `docker-compose.yml`
 - Deploy
 
-Danach erreichbar unter `http://<nas-ip>:8080/`. Den Host-Port in
-`docker-compose.yml` anpassen, falls 8080 belegt ist.
+Danach erreichbar unter `http://<nas-ip>:1913/`. Den Host-Port in
+`docker-compose.yml` anpassen, falls 1913 belegt ist.
 
 Alternativ ohne Git (Web editor): den Inhalt von `docker-compose.yml` einfügen –
 Portainer baut das Image dann aus dem `Dockerfile`.
 
 Manuell auf der Kommandozeile:
 
-    docker compose up -d        # baut und startet, Port 8080
+    docker compose up -d        # baut und startet, Port 1913
 
 ## Desktop-Variante (optional)
 `ebenen_schnitt_gui.py` ist eine eigenständige tkinter-App (gleiche Funktionen).
