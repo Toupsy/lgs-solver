@@ -12,6 +12,7 @@ drehbarer 3D-Ansicht. Gedacht für den Mathematikunterricht.
 - Exakte Rechnung mit Brüchen (kein Rundungsfehler), bleibt möglichst ganzzahlig.
 - Lösung als Additionsverfahren – ganze Gleichungen kombinieren, keine Pivotsuche.
 - **Hilfe-Modus:** Rechenschritte einzeln aufdecken zum Selber-Lösen.
+- **Aufgaben-Presets:** drei Knöpfe laden vorher eingestellte Aufgabenwerte direkt in die Eingabefelder.
 - **3D-Ansicht:** beide Ebenen + Schnittgerade/-punkt, mit Maus oder Finger drehbar, Zoom per Scrollen/Pinch.
 - Fälle: Schnittgerade, einzelner Schnittpunkt, identische Ebenen, echt parallel.
 

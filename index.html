@@ -28,6 +28,10 @@
   .primary { background:var(--blau); color:#fff; }
   .go { background:var(--gruen); color:#fff; }
   .ghost { background:#e6e6e6; }
+  .presetBlock { margin-top:12px; }
+  .presetTitle { font-weight:600; font-size:.9rem; margin-bottom:6px; }
+  .presetBtn { background:#e6e6e6; color:#222; }
+  .presetBtn.active { background:var(--blau); color:#fff; font-weight:600; }
   .btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
   .helpbar { display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap; }
   .tabs { display:flex; gap:4px; margin-bottom:10px; }
@@ -68,6 +72,14 @@
     <div class="vrow"><label>c (Richtung 1)</label><input id="c0"><input id="c1"><input id="c2"></div>
     <div class="vrow"><label>d (Richtung 2)</label><input id="d0"><input id="d1"><input id="d2"></div>
     <p class="hint">Ganze Zahlen oder Brüche wie 1/2 (Dezimal mit . oder , geht auch).</p>
+    <div class="presetBlock">
+      <div class="presetTitle">Aufgaben-Presets</div>
+      <div class="btns" id="presetBtns">
+        <button class="presetBtn" data-preset="0">Aufgabe 1</button>
+        <button class="presetBtn" data-preset="1">Aufgabe 2</button>
+        <button class="presetBtn" data-preset="2">Aufgabe 3</button>
+      </div>
+    </div>
     <div class="btns">
       <button class="primary" id="solveBtn">Lösen</button>
       <button class="ghost" id="exBtn">Beispiel laden</button>
@@ -306,10 +318,25 @@ function typeset(el){
   }
 }
 const keys=["P","a","b","Q","c","d"];
+// Hier kannst du deine drei festen Aufgaben/Preset-Werte vorab einstellen.
+// Jeder Vektor besteht aus drei Einträgen; Brüche als String wie "1/2" sind möglich.
+const PRESETS = [
+  {name:"Aufgabe 1", P:[1,1,-1], a:[1,0,2], b:[0,2,0], Q:[0,-1,1], c:[-1,2,-1], d:[-1,4,2]},
+  {name:"Aufgabe 2", P:[0,0,0], a:[1,0,0], b:[0,1,0], Q:[0,0,1], c:[1,0,0], d:[0,1,0]},
+  {name:"Aufgabe 3", P:[1,2,3], a:[1,1,0], b:[0,1,1], Q:[2,3,4], c:[1,1,0], d:[0,1,1]}
+];
 function readVec(k){ return [0,1,2].map(i=>Frac.parse($(k+i).value)); }
-function setEx(){
-  const ex={P:[1,1,-1],a:[1,0,2],b:[0,2,0],Q:[0,-1,1],c:[-1,2,-1],d:[-1,4,2]};
+function loadPreset(index){
+  const ex=PRESETS[index];
+  if(!ex) return;
   for(const k of keys) ex[k].forEach((v,i)=> $(k+i).value=v);
+  document.querySelectorAll(".presetBtn").forEach(btn=>{
+    btn.classList.toggle("active", Number(btn.dataset.preset)===index);
+  });
+  doSolve();
+}
+function setEx(){
+  loadPreset(0);
 }
 
 const state={steps:[],shown:0,geo:null};
@@ -341,10 +368,14 @@ function doSolve(){
   render();
 }
 $("solveBtn").onclick=doSolve;
-$("exBtn").onclick=()=>{ setEx(); doSolve(); };
+$("exBtn").onclick=()=>setEx();
 $("helpMode").onchange=doSolve;
 $("nextBtn").onclick=()=>{ if(state.shown<state.steps.length){ state.shown++; render(); } };
 $("allBtn").onclick=()=>{ state.shown=state.steps.length; render(); };
+document.querySelectorAll(".presetBtn").forEach(btn=>{
+  btn.textContent = PRESETS[Number(btn.dataset.preset)]?.name || btn.textContent;
+  btn.onclick=()=>loadPreset(Number(btn.dataset.preset));
+});
 
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
@@ -456,7 +487,7 @@ cv.addEventListener("wheel",e=>{ e.preventDefault(); zoom*=Math.exp(-e.deltaY*0.
 window.addEventListener("resize",()=>{ if($("view3d").classList.contains("hidden")) return;
   geo3d?drawGeo():drawPlaceholder(); });
 
-setEx(); doSolve();
+setEx();
 </script>
 </body>
 </html>
