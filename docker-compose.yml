@@ -1,6 +1,10 @@
 services:
   lgs-solver:
-    build: .
+    # Portainer-Web-Editor hat keinen lokalen Dockerfile-Kontext.
+    # Darum wird der Build-Kontext explizit aus GitHub geladen.
+    build:
+      context: https://github.com/Toupsy/lgs-solver.git#main
+      dockerfile: Dockerfile
     image: lgs-solver
     container_name: lgs-solver
     ports:

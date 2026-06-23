@@ -36,8 +36,15 @@ Die App läuft als winziger nginx-Container.
 Danach erreichbar unter `http://<nas-ip>:1913/`. Den Host-Port in
 `docker-compose.yml` anpassen, falls 1913 belegt ist.
 
-Alternativ ohne Git (Web editor): den Inhalt von `docker-compose.yml` einfügen –
-Portainer baut das Image dann aus dem `Dockerfile`.
+Alternativ ohne Git (Web editor): den Inhalt von `docker-compose.yml` einfügen.
+Die Compose-Datei nutzt dafür absichtlich einen GitHub-Build-Kontext, damit
+Portainer auch im Web-Editor den `Dockerfile` findet.
+
+Wenn Portainer meldet `failed to read dockerfile: open Dockerfile: no such file
+or directory`, wurde vermutlich eine alte Compose-Version mit `build: .` genutzt.
+Dann den Stack-Editor öffnen, aktuellen Inhalt von `docker-compose.yml` einfügen
+oder den Stack als Repository-Stack mit Compose path `docker-compose.yml` neu
+deployen.
 
 Manuell auf der Kommandozeile:
 
