@@ -7,6 +7,8 @@ drehbarer 3D-Ansicht. Gedacht für den Mathematikunterricht.
 **E1:** x = P + s·a + t·b  **E2:** x = Q + u·c + v·d
 
 ## Funktionen
+- Rechenweg in echter Mathematik-Schrift (LaTeX/MathJax): Vektoren als
+  Spaltenvektoren, Brüche als Bruch, das LGS als augmentierte Matrix.
 - Exakte Rechnung mit Brüchen (kein Rundungsfehler), bleibt möglichst ganzzahlig.
 - Lösung als Additionsverfahren – ganze Gleichungen kombinieren, keine Pivotsuche.
 - **Hilfe-Modus:** Rechenschritte einzeln aufdecken zum Selber-Lösen.
@@ -15,7 +17,8 @@ drehbarer 3D-Ansicht. Gedacht für den Mathematikunterricht.
 
 ## Nutzung
 Einfach `index.html` im Browser öffnen – keine Installation, kein Server nötig.
-Die ganze App steckt in dieser einen Datei.
+Die ganze App steckt in dieser einen Datei. Für die Formelschrift wird MathJax
+per CDN nachgeladen, dafür ist beim Öffnen eine Internetverbindung nötig.
 
 ## Deploy (GitHub Pages)
 Settings → Pages → Branch `main`, Ordner `/ (root)`. Die Seite ist dann unter
