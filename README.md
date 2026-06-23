@@ -26,29 +26,37 @@ Settings → Pages → Branch `main`, Ordner `/ (root)`. Die Seite ist dann unte
 oder per `<iframe>` eingebettet werden.
 
 ## Deploy via Portainer (Docker, z.B. auf NAS)
-Die App läuft als winziger nginx-Container.
+Die App läuft mit dem fertigen Standard-Image `nginx:alpine`. Portainer muss
+keinen `Dockerfile` bauen. Beim Container-Start lädt nginx die aktuelle
+`index.html` aus GitHub.
 
-**Portainer → Stacks → Add stack → Repository:**
-- Repository URL: dieses Git-Repo
-- Compose path: `docker-compose.yml`
-- Deploy
+**Portainer → Stacks → Add stack → Web editor:**
 
-Danach erreichbar unter `http://<nas-ip>:1913/`. Den Host-Port in
-`docker-compose.yml` anpassen, falls 1913 belegt ist.
+```yaml
+services:
+  lgs-solver:
+    image: nginx:alpine
+    container_name: lgs-solver
+    command: >
+      /bin/sh -c "wget -O /usr/share/nginx/html/index.html
+      https://raw.githubusercontent.com/Toupsy/lgs-solver/main/index.html
+      && nginx -g 'daemon off;'"
+    ports:
+      - "1913:80"
+    restart: unless-stopped
+```
 
-Alternativ ohne Git (Web editor): den Inhalt von `docker-compose.yml` einfügen.
-Die Compose-Datei nutzt dafür absichtlich einen GitHub-Build-Kontext, damit
-Portainer auch im Web-Editor den `Dockerfile` findet.
+Danach erreichbar unter `http://<nas-ip>:1913/`. Den Host-Port anpassen, falls
+1913 belegt ist.
 
 Wenn Portainer meldet `failed to read dockerfile: open Dockerfile: no such file
-or directory`, wurde vermutlich eine alte Compose-Version mit `build: .` genutzt.
-Dann den Stack-Editor öffnen, aktuellen Inhalt von `docker-compose.yml` einfügen
-oder den Stack als Repository-Stack mit Compose path `docker-compose.yml` neu
-deployen.
+or directory`, ist noch eine alte Compose-Version mit `build:` im Stack. In dem
+Fall den Stack-Editor öffnen, alles Alte entfernen und die image-only Compose-
+Version oben einfügen.
 
 Manuell auf der Kommandozeile:
 
-    docker compose up -d        # baut und startet, Port 1913
+    docker compose up -d        # zieht nginx:alpine und lädt index.html beim Start
 
 ## Desktop-Variante (optional)
 `ebenen_schnitt_gui.py` ist eine eigenständige tkinter-App (gleiche Funktionen).
