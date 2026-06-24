@@ -1,8 +1,11 @@
 services:
   lgs-solver:
-    build: .
-    image: lgs-solver
+    image: nginx:alpine
     container_name: lgs-solver
+    command: >
+      /bin/sh -c "wget -O /usr/share/nginx/html/index.html
+      https://raw.githubusercontent.com/Toupsy/lgs-solver/main/index.html
+      && nginx -g 'daemon off;'"
     ports:
       - "1913:80"        # Host-Port 1913 -> hier anpassen, falls belegt
     restart: unless-stopped

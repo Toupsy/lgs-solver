@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Schnitt zweier Ebenen (Parameterform)</title>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
 <style>
   :root { --blau:#4a90d9; --blaudk:#1c5a96; --rot:#d9534f; --rotdk:#9c2b27;
           --gruen:#1a7d33; --bg:#f4f4f4; --karte:#fff; }
@@ -29,6 +28,10 @@
   .primary { background:var(--blau); color:#fff; }
   .go { background:var(--gruen); color:#fff; }
   .ghost { background:#e6e6e6; }
+  .presetBlock { margin-top:12px; }
+  .presetTitle { font-weight:600; font-size:.9rem; margin-bottom:6px; }
+  .presetBtn { background:#e6e6e6; color:#222; }
+  .presetBtn.active { background:var(--blau); color:#fff; font-weight:600; }
   .btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
   .helpbar { display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap; }
   .tabs { display:flex; gap:4px; margin-bottom:10px; }
@@ -37,16 +40,24 @@
   #steps { font-size:.95rem; line-height:1.4; max-height:62vh; overflow:auto; }
   .s-head { font-weight:700; color:var(--blaudk); margin:.9rem 0 .3rem; }
   .s-text { white-space:pre-wrap; margin:.2rem 0; }
-  .s-mat  { font-family:"Consolas",ui-monospace,monospace; background:#f0f4f8;
-            padding:6px 10px; border-radius:6px; white-space:pre; overflow-x:auto; margin:.3rem 0; }
-  .s-res  { font-family:"Consolas",ui-monospace,monospace; font-weight:700; color:var(--gruen);
+  .s-mat  { background:#f0f4f8; padding:6px 10px; border-radius:6px;
+            overflow-x:auto; margin:.3rem 0; text-align:center; }
+  .s-res  { font-weight:700; color:var(--gruen);
             background:#eaf7ec; padding:8px 10px; border-radius:6px; white-space:pre-wrap; margin:.4rem 0; }
   canvas { width:100%; max-width:560px; height:440px; background:#fff; border-radius:8px;
            touch-action:none; cursor:grab; display:block; }
   canvas.grabbing { cursor:grabbing; }
   .canvas-hint { color:#888; font-size:.8rem; margin-top:6px; }
   .hidden { display:none; }
+  mjx-container[display="true"] { margin:.35em 0 !important; }
 </style>
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]'],['$$','$$']] },
+    options: { renderActions: { addMenu: [] } }
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -61,13 +72,16 @@
     <div class="vrow"><label>c (Richtung 1)</label><input id="c0"><input id="c1"><input id="c2"></div>
     <div class="vrow"><label>d (Richtung 2)</label><input id="d0"><input id="d1"><input id="d2"></div>
     <p class="hint">Ganze Zahlen oder Brüche wie 1/2 (Dezimal mit . oder , geht auch).</p>
+    <div class="presetBlock">
+      <div class="presetTitle">Aufgaben-Presets</div>
+      <div class="btns" id="presetBtns">
+        <button class="presetBtn" data-preset="0">Aufgabe 1</button>
+        <button class="presetBtn" data-preset="1">Aufgabe 2</button>
+        <button class="presetBtn" data-preset="2">Aufgabe 3</button>
+      </div>
+    </div>
     <div class="btns">
       <button class="primary" id="solveBtn">Lösen</button>
-      <select id="presetSel" class="ghost" style="padding:8px 12px;border-radius:6px;cursor:pointer;">
-        <option value="0">Aufgabe 1</option>
-        <option value="1">Aufgabe 2</option>
-        <option value="2">Aufgabe 3</option>
-      </select>
     </div>
     <div class="helpbar">
       <label><input type="checkbox" id="helpMode" checked> Hilfe-Modus (Schritte einzeln)</label>
@@ -130,32 +144,45 @@ class Frac {
 const F0 = new Frac(0n), F1 = new Frac(1n);
 const Fi = (x)=> new Frac(BigInt(x));
 
-/* ---------- LaTeX-Formatierung ---------- */
-function texF(f){ // Bruch -> LaTeX
+/* ---------- Formatierung (LaTeX) ---------- */
+const fmt = f => f.toString();
+// Bruch/Ganzzahl als LaTeX-Term
+function tex(f){
   if(f.d===1n) return f.n.toString();
-  return (f.n<0n?"-":"")+`\\tfrac{${(f.n<0n?-f.n:f.n)}}{${f.d}}`;
+  const neg = f.n<0n;
+  const n = (neg?-f.n:f.n).toString();
+  return (neg?"-":"") + `\\tfrac{${n}}{${f.d}}`;
 }
-const texVec = v => `\\begin{pmatrix}${v.map(texF).join("\\\\")}\\end{pmatrix}`;
-function texMatrix(M){
-  const head = "s & t & u & v & = \\\\ \\hline ";
-  const rows = M.map(r=>`${r.slice(0,4).map(texF).join(" & ")} & ${texF(r[4])}`).join(" \\\\ ");
-  return `\\left[\\begin{array}{rrrr|r} ${head}${rows} \\end{array}\\right]`;
+// Spaltenvektor
+const texVec = v => `\\begin{pmatrix} ${v.map(tex).join(" \\\\ ")} \\end{pmatrix}`;
+// augmentierte Matrix mit Spaltenkoepfen s t u v | rhs (fertiger Display-Block)
+function fmtMatrix(M){
+  const body = M.map(r=>r.map(tex).join(" & ")).join(" \\\\ ");
+  return "\\[\\left[\\begin{array}{cccc|c} s & t & u & v & \\\\ \\hline "
+       + body + " \\end{array}\\right]\\]";
 }
-function texMul(k, name, lead=false){ // k * Bezeichner (z.B. Gl.2)
+function multerm(k, name, lead=false){
   let s;
   if(k.eq(F1)) s=name;
   else if(k.eq(F1.neg())) s="-"+name;
-  else s=`${texF(k)}\\cdot ${name}`;
+  else s=`${fmt(k)}·${name}`;
   if(lead) return (k.gt0()? "+ ":"- ") + (s.startsWith("-")?s.slice(1):s);
   return s;
 }
-function texExpr(e, name="r"){ // e=[Konstante, Faktor vor der freien Variable]
+// e=[const, Faktor vor der freien Variable] -> LaTeX, z.B. "3 + 3v" oder "-\tfrac{1}{2}v"
+function exprStr(e, name="r"){
   const [cst,r]=e;
-  if(r.isZero()) return texF(cst);
+  if(r.isZero()) return tex(cst);
   const ra = r.gt0()? r : r.neg();
-  const rmag = ra.eq(F1) ? name : `${texF(ra)}\\,${name}`;
+  const rmag = ra.eq(F1) ? name : `${tex(ra)}${name}`;
   if(cst.isZero()) return (r.gt0()?"":"-")+rmag;
-  return `${texF(cst)} ${r.gt0()?"+":"-"} ${rmag}`;
+  return `${tex(cst)} ${r.gt0()?"+":"-"} ${rmag}`;
+}
+// Ebenengleichung als LaTeX-Term (ohne Delimiter)
+function texPlane(name,p,dirs,params){
+  let s = `${name}:\\quad \\vec{x} = ${texVec(p)}`;
+  dirs.forEach((dv,i)=> s += ` + ${params[i]}\\,${texVec(dv)}`);
+  return s;
 }
 
 /* ---------- Vektor-Helfer ---------- */
@@ -179,17 +206,17 @@ function solve(P,a,b,Q,c,d){
   const geo={type:"none", planes:{P,a,b,Q,c,d}};
 
   add("head","Aufgabe");
-  add("text",`\\(E_1:\\ \\vec x = ${texVec(P)} + s\\,${texVec(a)} + t\\,${texVec(b)}\\)\n`+
-             `\\(E_2:\\ \\vec x = ${texVec(Q)} + u\\,${texVec(c)} + v\\,${texVec(d)}\\)`);
+  add("text",`\\[${texPlane("E_1",P,[a,b],["s","t"])}\\]`+
+             `\\[${texPlane("E_2",Q,[c,d],["u","v"])}\\]`);
   add("head","Schritt 1 – Ebenen gleichsetzen");
-  add("text","\\(\\vec P + s\\,\\vec a + t\\,\\vec b = \\vec Q + u\\,\\vec c + v\\,\\vec d\\)\n"+
+  add("text","\\[P + s\\,\\vec a + t\\,\\vec b = Q + u\\,\\vec c + v\\,\\vec d\\]"+
              "Unbekannte nach links, Konstanten nach rechts:\n"+
-             "\\(s\\,\\vec a + t\\,\\vec b - u\\,\\vec c - v\\,\\vec d = \\vec Q - \\vec P\\)");
+             "\\[s\\,\\vec a + t\\,\\vec b - u\\,\\vec c - v\\,\\vec d = Q - P\\]");
 
   let M=[0,1,2].map(i=>[a[i],b[i],c[i].neg(),d[i].neg(),Q[i].sub(P[i])]);
   add("head","Schritt 2 – Gleichungssystem (3 Gleichungen, Unbekannte s,t,u,v)");
   add("text","Spalten = Koeffizienten von s, t, u, v ; rechts die Konstante:");
-  add("mat",texMatrix(M));
+  add("mat",fmtMatrix(M));
 
   add("head","Schritt 3 – Variablen eliminieren (Additionsverfahren)");
   add("text","Wir kombinieren ganze Gleichungen, sodass je eine Variable wegfällt.\n"+
@@ -201,15 +228,15 @@ function solve(P,a,b,Q,c,d){
     if(r<0) continue;
     if(r!==srow){ [M[srow],M[r]]=[M[r],M[srow]];
       add("text",`Gl.${srow+1} und Gl.${r+1} tauschen, damit '${names[col]}' in Gl.${srow+1} vorkommt:`);
-      add("mat",texMatrix(M)); }
+      add("mat",fmtMatrix(M)); }
     for(let i=srow+1;i<3;i++){
       if(!M[i][col].isZero()){
         const n=M[srow][col], m=M[i][col];
         M[i]=M[i].map((x,k)=> n.mul(M[i][k]).sub(m.mul(M[srow][k])));
-        add("text",`\\(\\text{Gl.}${i+1} := ${texMul(n,`\\text{Gl.}${i+1}`)} ${texMul(m.neg(),`\\text{Gl.}${srow+1}`,true)}\\)   ⟹ '${names[col]}' fällt weg`);
+        add("text",`Gl.${i+1} := ${multerm(n,`Gl.${i+1}`)} ${multerm(m.neg(),`Gl.${srow+1}`,true)}   => '${names[col]}' fällt weg`);
         const g=rowGcd(M[i]);
         if(g>1n){ M[i]=M[i].map(x=>x.div(new Frac(g,1n))); add("text",`Gl.${i+1} durch ${g} kürzen.`); }
-        add("mat",texMatrix(M));
+        add("mat",fmtMatrix(M));
       }
     }
     lead.push([col,srow]); srow++; if(srow===3) break;
@@ -232,7 +259,7 @@ function solve(P,a,b,Q,c,d){
       for(let j=0;j<4;j++){ if(j!==col && !M[row][j].isZero()){
         const xj=sol[j]; acc=[acc[0].sub(M[row][j].mul(xj[0])), acc[1].sub(M[row][j].mul(xj[1]))]; } }
       sol[col]=[acc[0].div(pv), acc[1].div(pv)];
-      add("text",`Gl.${row+1} nach '${names[col]}' auflösen:  \\(${names[col]} = ${texExpr(sol[col],freeName)}\\)`);
+      add("text",`Gl.${row+1} nach \\(${names[col]}\\) auflösen:  \\(${names[col]} = ${exprStr(sol[col],freeName)}\\)`);
     }
     return [0,1,2,3].map(j=>sol[j]);
   }
@@ -256,8 +283,10 @@ function solve(P,a,b,Q,c,d){
              `Wir bestimmen \\(${names[bcol]}\\) in Abhängigkeit von \\(${freeName}\\) und setzen dann nach oben ein.`);
   const sol=backSub();
   add("text","Zusammengefasst:\n"+
-             [0,1,2,3].map(j=> j===fv ? `\\(${names[j]}\\ \\text{frei wählbar}\\)`
-                                      : `\\(${names[j]} = ${texExpr(sol[j],freeName)}\\)`).join("\n"));
+             "\\[\\begin{aligned} "+
+             [0,1,2,3].map(j=> j===fv ? `${names[j]} &\\ \\text{frei wählbar}`
+                                      : `${names[j]} &= ${exprStr(sol[j],freeName)}`).join(" \\\\ ")+
+             " \\end{aligned}\\]");
   const stuetz=[0,1,2].map(i=>P[i].add(sol[0][0].mul(a[i])).add(sol[1][0].mul(b[i])));
   const richtung=[0,1,2].map(i=>sol[0][1].mul(a[i]).add(sol[1][1].mul(b[i])));
   const rc=cleanDir(richtung);
@@ -267,16 +296,33 @@ function solve(P,a,b,Q,c,d){
 
 /* ---------- UI ---------- */
 const $=id=>document.getElementById(id);
+function typeset(el){
+  if(window.MathJax && window.MathJax.typesetPromise){
+    if(window.MathJax.typesetClear) window.MathJax.typesetClear([el]);
+    window.MathJax.typesetPromise([el]).then(()=>{ el.scrollTop=el.scrollHeight; })
+      .catch(()=>{});
+  }
+}
 const keys=["P","a","b","Q","c","d"];
-function readVec(k){ return [0,1,2].map(i=>Frac.parse($(k+i).value)); }
-const presets=[
-  {P:[1,1,-1], a:[1,0,2],  b:[0,2,0],  Q:[0,-1,1], c:[-1,2,-1], d:[-1,4,2]},
-  {P:[4,1,4],  a:[2,1,0],  b:[-1,0,3], Q:[2,0,4],  c:[1,1,3],   d:[5,2,-3]},
-  {P:[-1,2,2], a:[1,0,-2], b:[2,-1,3], Q:[3,-1,-2],c:[3,-1,1],  d:[1,-1,5]},
+// Hier kannst du deine drei festen Aufgaben/Preset-Werte vorab einstellen.
+// Jeder Vektor besteht aus drei Einträgen; Brüche als String wie "1/2" sind möglich.
+const PRESETS = [
+  {name:"Aufgabe 1", P:[1,1,-1], a:[1,0,2],  b:[0,2,0],  Q:[0,-1,1], c:[-1,2,-1], d:[-1,4,2]},
+  {name:"Aufgabe 2", P:[4,1,4],  a:[2,1,0],  b:[-1,0,3], Q:[2,0,4],  c:[1,1,3],   d:[5,2,-3]},
+  {name:"Aufgabe 3", P:[-1,2,2], a:[1,0,-2], b:[2,-1,3], Q:[3,-1,-2],c:[3,-1,1],  d:[1,-1,5]}
 ];
-function setEx(i=0){
-  const ex=presets[i];
-  for(const k of keys) ex[k].forEach((v,j)=> $(k+j).value=v);
+function readVec(k){ return [0,1,2].map(i=>Frac.parse($(k+i).value)); }
+function loadPreset(index){
+  const ex=PRESETS[index];
+  if(!ex) return;
+  for(const k of keys) ex[k].forEach((v,i)=> $(k+i).value=v);
+  document.querySelectorAll(".presetBtn").forEach(btn=>{
+    btn.classList.toggle("active", Number(btn.dataset.preset)===index);
+  });
+  doSolve();
+}
+function setEx(){
+  loadPreset(0);
 }
 
 const state={groups:[],shown:0,geo:null};
@@ -296,10 +342,10 @@ function render(){
   state.groups.slice(0,state.shown).flat().forEach(s=>{
     const div=document.createElement("div");
     div.className = s.kind==="head"?"s-head":s.kind==="mat"?"s-mat":s.kind==="res"?"s-res":"s-text";
-    div.textContent = s.kind==="mat" ? `\\[${s.text}\\]` : s.text;
+    if(s.kind==="head") div.textContent=s.text; else div.innerHTML=s.text;
     el.appendChild(div);
   });
-  if(window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([el]).catch(()=>{});
+  typeset(el);
   el.scrollTop=el.scrollHeight;
   const done=state.shown>=n;
   $("tab3d").classList.toggle("hidden", !done); // 3D-Tab erst am Ende
@@ -320,9 +366,12 @@ function doSolve(){
   render();
 }
 $("solveBtn").onclick=doSolve;
-$("presetSel").onchange=()=>{ setEx(+$("presetSel").value); doSolve(); };
 $("helpMode").onchange=doSolve;
 $("nextBtn").onclick=()=>{ if(state.shown<state.groups.length){ state.shown++; render(); } };
+document.querySelectorAll(".presetBtn").forEach(btn=>{
+  btn.textContent = PRESETS[Number(btn.dataset.preset)]?.name || btn.textContent;
+  btn.onclick=()=>loadPreset(Number(btn.dataset.preset));
+});
 
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
@@ -434,7 +483,7 @@ cv.addEventListener("wheel",e=>{ e.preventDefault(); zoom*=Math.exp(-e.deltaY*0.
 window.addEventListener("resize",()=>{ if($("view3d").classList.contains("hidden")) return;
   geo3d?drawGeo():drawPlaceholder(); });
 
-setEx(); doSolve();
+setEx();
 </script>
 </body>
 </html>
