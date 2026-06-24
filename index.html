@@ -82,21 +82,19 @@
     </div>
     <div class="btns">
       <button class="primary" id="solveBtn">Lösen</button>
-      <button class="ghost" id="exBtn">Beispiel laden</button>
     </div>
     <div class="helpbar">
       <label><input type="checkbox" id="helpMode" checked> Hilfe-Modus (Schritte einzeln)</label>
     </div>
     <div class="helpbar">
       <button class="go" id="nextBtn">Nächster Schritt</button>
-      <button class="ghost" id="allBtn">Alles zeigen</button>
     </div>
   </div>
 
   <div class="panel right">
     <div class="tabs">
       <div class="tab active" data-tab="steps">Rechenweg</div>
-      <div class="tab" data-tab="view3d">3D-Ansicht</div>
+      <div class="tab hidden" id="tab3d" data-tab="view3d">3D-Ansicht</div>
     </div>
     <div id="steps"></div>
     <div id="view3d" class="hidden">
@@ -171,12 +169,12 @@ function multerm(k, name, lead=false){
   if(lead) return (k.gt0()? "+ ":"- ") + (s.startsWith("-")?s.slice(1):s);
   return s;
 }
-// e=[const, rFaktor] -> LaTeX, z.B. "3 + 3r" oder "-\tfrac{1}{2}r"
-function exprStr(e){
+// e=[const, Faktor vor der freien Variable] -> LaTeX, z.B. "3 + 3v" oder "-\tfrac{1}{2}v"
+function exprStr(e, name="r"){
   const [cst,r]=e;
   if(r.isZero()) return tex(cst);
   const ra = r.gt0()? r : r.neg();
-  const rmag = ra.eq(F1) ? "r" : `${tex(ra)}r`;
+  const rmag = ra.eq(F1) ? name : `${tex(ra)}${name}`;
   if(cst.isZero()) return (r.gt0()?"":"-")+rmag;
   return `${tex(cst)} ${r.gt0()?"+":"-"} ${rmag}`;
 }
@@ -188,7 +186,6 @@ function texPlane(name,p,dirs,params){
 }
 
 /* ---------- Vektor-Helfer ---------- */
-const vsub=(a,b)=>a.map((x,i)=>x.sub(b[i]));
 function rowGcd(row){ // ggT, 0 falls nicht ganzzahlig
   let g=0n;
   for(const x of row){ if(x.d!==1n) return 0n; g=bgcd(g, x.n<0n?-x.n:x.n); }
@@ -214,8 +211,7 @@ function solve(P,a,b,Q,c,d){
   add("head","Schritt 1 – Ebenen gleichsetzen");
   add("text","\\[P + s\\,\\vec a + t\\,\\vec b = Q + u\\,\\vec c + v\\,\\vec d\\]"+
              "Unbekannte nach links, Konstanten nach rechts:\n"+
-             "\\[s\\,\\vec a + t\\,\\vec b - u\\,\\vec c - v\\,\\vec d = Q - P\\]"+
-             `\\[Q - P = ${texVec(Q)} - ${texVec(P)} = ${texVec(vsub(Q,P))}\\]`);
+             "\\[s\\,\\vec a + t\\,\\vec b - u\\,\\vec c - v\\,\\vec d = Q - P\\]");
 
   let M=[0,1,2].map(i=>[a[i],b[i],c[i].neg(),d[i].neg(),Q[i].sub(P[i])]);
   add("head","Schritt 2 – Gleichungssystem (3 Gleichungen, Unbekannte s,t,u,v)");
@@ -224,7 +220,7 @@ function solve(P,a,b,Q,c,d){
 
   add("head","Schritt 3 – Variablen eliminieren (Additionsverfahren)");
   add("text","Wir kombinieren ganze Gleichungen, sodass je eine Variable wegfällt.\n"+
-             "Nur ganzzahlige Vielfache, kein Teilen, keine Pivotsuche.");
+             "Nur ganzzahlige Vielfache, kein Teilen.");
 
   const names=["s","t","u","v"]; const lead=[]; let srow=0;
   for(let col=0; col<4; col++){
@@ -245,19 +241,15 @@ function solve(P,a,b,Q,c,d){
     }
     lead.push([col,srow]); srow++; if(srow===3) break;
   }
-  add("text","Umgeformtes System (Stufenform):");
-  add("mat",fmtMatrix(M));
-
   for(let i=0;i<3;i++){
     if(M[i].slice(0,4).every(x=>x.isZero()) && !M[i][4].isZero()){
-      add("head","Ergebnis");
-      add("res",`Gl.${i+1} ergibt \\(0 = ${tex(M[i][4])}\\)  →  Widerspruch.\nDie Ebenen sind echt parallel, es gibt KEINEN Schnitt.`);
-      return {steps,geo};
+      return {steps,geo}; // ponytail: endet an Stufenform, Deutung den SuS überlassen
     }
   }
 
   const leadCols=lead.map(x=>x[0]);
   const free=[0,1,2,3].filter(j=>!leadCols.includes(j));
+  let freeName="r"; // im Geraden-Fall der Name der freien Variable (z.B. "v")
 
   function backSub(){
     const sol={}; for(const j of free) sol[j]=[F0,F1];
@@ -267,43 +259,37 @@ function solve(P,a,b,Q,c,d){
       for(let j=0;j<4;j++){ if(j!==col && !M[row][j].isZero()){
         const xj=sol[j]; acc=[acc[0].sub(M[row][j].mul(xj[0])), acc[1].sub(M[row][j].mul(xj[1]))]; } }
       sol[col]=[acc[0].div(pv), acc[1].div(pv)];
-      add("text",`Gl.${row+1} nach \\(${names[col]}\\) auflösen:  \\(${names[col]} = ${exprStr(sol[col])}\\)`);
+      add("text",`Gl.${row+1} nach \\(${names[col]}\\) auflösen:  \\(${names[col]} = ${exprStr(sol[col],freeName)}\\)`);
     }
     return [0,1,2,3].map(j=>sol[j]);
   }
 
   if(free.length===0){
+    add("head","Schritt 4 – rückwärts einsetzen");
     const sol=backSub(); const s0=sol[0][0], t0=sol[1][0];
     const pt=[0,1,2].map(i=>P[i].add(s0.mul(a[i])).add(t0.mul(b[i])));
-    add("head","Schritt 5 – in E1 einsetzen");
-    add("text",`\\(\\vec{x} = P + s\\,\\vec a + t\\,\\vec b\\) mit \\(s = ${tex(s0)}\\), \\(t = ${tex(t0)}\\)`+
-               `\\[\\vec{x} = ${texVec(pt)}\\]`);
-    add("head","Ergebnis"); add("res",`Genau ein gemeinsamer Punkt:\\[${texVec(pt)}\\]`);
     geo.type="point"; geo.point=pt.map(x=>x.num());
     return {steps,geo};
   }
   if(free.length>=2){
-    add("head","Ergebnis"); add("res","Zwei freie Parameter -> die Ebenen sind identisch (ganze Ebene).");
-    geo.type="plane"; return {steps,geo};
+    geo.type="plane"; return {steps,geo}; // ponytail: Deutung den SuS überlassen
   }
 
   const fv=free[0];
+  freeName=names[fv];
+  const [bcol,brow]=lead[lead.length-1]; // unterste Leitgleichung
   add("head","Schritt 4 – rückwärts einsetzen");
-  add("text",`\\(${names[fv]}\\) wird von keiner Gleichung gebunden → frei wählbar.\n`+
-             `Setze \\(${names[fv]} = r\\). Jede andere Variable: [Konstante] + [Faktor]·r.`);
+  add("text",`In Gl.${brow+1} steht jetzt eine Gleichung mit nur noch zwei Variablen (\\(${names[bcol]}\\) und \\(${freeName}\\)).\n`+
+             `Wir bestimmen \\(${names[bcol]}\\) in Abhängigkeit von \\(${freeName}\\) und setzen dann nach oben ein.`);
   const sol=backSub();
   add("text","Zusammengefasst:\n"+
-             `\\[\\begin{aligned} s &= ${exprStr(sol[0])} \\\\ t &= ${exprStr(sol[1])} \\\\ `+
-             `u &= ${exprStr(sol[2])} \\\\ v &= ${exprStr(sol[3])} \\end{aligned}\\]`);
+             "\\[\\begin{aligned} "+
+             [0,1,2,3].map(j=> j===fv ? `${names[j]} &\\ \\text{frei wählbar}`
+                                      : `${names[j]} &= ${exprStr(sol[j],freeName)}`).join(" \\\\ ")+
+             " \\end{aligned}\\]");
   const stuetz=[0,1,2].map(i=>P[i].add(sol[0][0].mul(a[i])).add(sol[1][0].mul(b[i])));
   const richtung=[0,1,2].map(i=>sol[0][1].mul(a[i]).add(sol[1][1].mul(b[i])));
   const rc=cleanDir(richtung);
-  add("head","Schritt 5 – in E1 einsetzen");
-  add("text","\\(\\vec{x} = P + s\\,\\vec a + t\\,\\vec b\\), \\(s\\) und \\(t\\) durch \\(r\\) ersetzen:\n"+
-             `Stützvektor \\((r=0)\\):\\[${texVec(stuetz)}\\]`+
-             `Richtung (Faktor vor \\(r\\)):\\[${texVec(richtung)} \\;\\longrightarrow\\; \\text{gekürzt}\\; ${texVec(rc)}\\]`);
-  add("head","Ergebnis – Schnittgerade");
-  add("res",`\\[g:\\quad \\vec{x} = ${texVec(stuetz)} + r\\,${texVec(rc)}\\]`);
   geo.type="line"; geo.stuetz=stuetz.map(x=>x.num()); geo.richtung=rc.map(x=>x.num());
   return {steps,geo};
 }
@@ -321,9 +307,9 @@ const keys=["P","a","b","Q","c","d"];
 // Hier kannst du deine drei festen Aufgaben/Preset-Werte vorab einstellen.
 // Jeder Vektor besteht aus drei Einträgen; Brüche als String wie "1/2" sind möglich.
 const PRESETS = [
-  {name:"Aufgabe 1", P:[1,1,-1], a:[1,0,2], b:[0,2,0], Q:[0,-1,1], c:[-1,2,-1], d:[-1,4,2]},
-  {name:"Aufgabe 2", P:[0,0,0], a:[1,0,0], b:[0,1,0], Q:[0,0,1], c:[1,0,0], d:[0,1,0]},
-  {name:"Aufgabe 3", P:[1,2,3], a:[1,1,0], b:[0,1,1], Q:[2,3,4], c:[1,1,0], d:[0,1,1]}
+  {name:"Aufgabe 1", P:[1,1,-1], a:[1,0,2],  b:[0,2,0],  Q:[0,-1,1], c:[-1,2,-1], d:[-1,4,2]},
+  {name:"Aufgabe 2", P:[4,1,4],  a:[2,1,0],  b:[-1,0,3], Q:[2,0,4],  c:[1,1,3],   d:[5,2,-3]},
+  {name:"Aufgabe 3", P:[-1,2,2], a:[1,0,-2], b:[2,-1,3], Q:[3,-1,-2],c:[3,-1,1],  d:[1,-1,5]}
 ];
 function readVec(k){ return [0,1,2].map(i=>Frac.parse($(k+i).value)); }
 function loadPreset(index){
@@ -339,12 +325,21 @@ function setEx(){
   loadPreset(0);
 }
 
-const state={steps:[],shown:0,geo:null};
+const state={groups:[],shown:0,geo:null};
 
+// Eine Überschrift wird zusammen mit ihrem folgenden Erklärtext als ein Schritt aufgedeckt.
+function groupSteps(steps){
+  const g=[];
+  for(let i=0;i<steps.length;i++){
+    if(steps[i].kind==="head" && steps[i+1] && steps[i+1].kind==="text"){ g.push([steps[i],steps[i+1]]); i++; }
+    else g.push([steps[i]]);
+  }
+  return g;
+}
 function render(){
   const el=$("steps"); el.innerHTML="";
-  const n=state.steps.length;
-  state.steps.slice(0,state.shown).forEach(s=>{
+  const n=state.groups.length;
+  state.groups.slice(0,state.shown).flat().forEach(s=>{
     const div=document.createElement("div");
     div.className = s.kind==="head"?"s-head":s.kind==="mat"?"s-mat":s.kind==="res"?"s-res":"s-text";
     if(s.kind==="head") div.textContent=s.text; else div.innerHTML=s.text;
@@ -353,6 +348,9 @@ function render(){
   typeset(el);
   el.scrollTop=el.scrollHeight;
   const done=state.shown>=n;
+  $("tab3d").classList.toggle("hidden", !done); // 3D-Tab erst am Ende
+  if(!done){ $("tab3d").classList.remove("active"); document.querySelector('.tab[data-tab="steps"]').classList.add("active");
+    $("steps").classList.remove("hidden"); $("view3d").classList.add("hidden"); }
   $("nextBtn").disabled=done;
   $("nextBtn").textContent = done? "Fertig ✓" : `Nächster Schritt (${state.shown}/${n})`;
   if(done && state.geo){ geo3d=state.geo; drawGeo(); }
@@ -363,15 +361,13 @@ function doSolve(){
   try{ P=readVec("P");a=readVec("a");b=readVec("b");Q=readVec("Q");c=readVec("c");d=readVec("d"); }
   catch(e){ alert("Bitte alle 18 Felder ausfüllen (z.B. 1, -2, 1/2)."); return; }
   const {steps,geo}=solve(P,a,b,Q,c,d);
-  state.steps=steps; state.geo=geo;
-  state.shown = $("helpMode").checked ? 0 : steps.length;
+  state.groups=groupSteps(steps); state.geo=geo;
+  state.shown = $("helpMode").checked ? 0 : state.groups.length;
   render();
 }
 $("solveBtn").onclick=doSolve;
-$("exBtn").onclick=()=>setEx();
 $("helpMode").onchange=doSolve;
-$("nextBtn").onclick=()=>{ if(state.shown<state.steps.length){ state.shown++; render(); } };
-$("allBtn").onclick=()=>{ state.shown=state.steps.length; render(); };
+$("nextBtn").onclick=()=>{ if(state.shown<state.groups.length){ state.shown++; render(); } };
 document.querySelectorAll(".presetBtn").forEach(btn=>{
   btn.textContent = PRESETS[Number(btn.dataset.preset)]?.name || btn.textContent;
   btn.onclick=()=>loadPreset(Number(btn.dataset.preset));
