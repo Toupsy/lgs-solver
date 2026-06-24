@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Schnitt zweier Ebenen (Parameterform)</title>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
 <style>
   :root { --blau:#4a90d9; --blaudk:#1c5a96; --rot:#d9534f; --rotdk:#9c2b27;
           --gruen:#1a7d33; --bg:#f4f4f4; --karte:#fff; }
@@ -62,21 +63,24 @@
     <p class="hint">Ganze Zahlen oder Brüche wie 1/2 (Dezimal mit . oder , geht auch).</p>
     <div class="btns">
       <button class="primary" id="solveBtn">Lösen</button>
-      <button class="ghost" id="exBtn">Beispiel laden</button>
+      <select id="presetSel" class="ghost" style="padding:8px 12px;border-radius:6px;cursor:pointer;">
+        <option value="0">Aufgabe 1</option>
+        <option value="1">Aufgabe 2</option>
+        <option value="2">Aufgabe 3</option>
+      </select>
     </div>
     <div class="helpbar">
       <label><input type="checkbox" id="helpMode" checked> Hilfe-Modus (Schritte einzeln)</label>
     </div>
     <div class="helpbar">
       <button class="go" id="nextBtn">Nächster Schritt</button>
-      <button class="ghost" id="allBtn">Alles zeigen</button>
     </div>
   </div>
 
   <div class="panel right">
     <div class="tabs">
       <div class="tab active" data-tab="steps">Rechenweg</div>
-      <div class="tab" data-tab="view3d">3D-Ansicht</div>
+      <div class="tab hidden" id="tab3d" data-tab="view3d">3D-Ansicht</div>
     </div>
     <div id="steps"></div>
     <div id="view3d" class="hidden">
@@ -126,40 +130,35 @@ class Frac {
 const F0 = new Frac(0n), F1 = new Frac(1n);
 const Fi = (x)=> new Frac(BigInt(x));
 
-/* ---------- Formatierung ---------- */
-const fmt = f => f.toString();
-const fmtVec = v => "(" + v.map(fmt).join("; ") + ")";
-function fmtMatrix(M){
-  const lab=["s","t","u","v",""];
-  const S = M.map(r=>r.map(fmt));
-  const w = lab.map((_,j)=> Math.max(...S.map(r=>r[j].length), lab[j].length));
-  const head = "    " + lab.map((l,j)=>l.padStart(w[j])).slice(0,4).join("   ");
-  const out=[head];
-  for(const r of S){
-    const body = r.slice(0,4).map((x,j)=>x.padStart(w[j])).join("   ");
-    out.push(` [ ${body} | ${r[4].padStart(w[4])} ]`);
-  }
-  return out.join("\n");
+/* ---------- LaTeX-Formatierung ---------- */
+function texF(f){ // Bruch -> LaTeX
+  if(f.d===1n) return f.n.toString();
+  return (f.n<0n?"-":"")+`\\tfrac{${(f.n<0n?-f.n:f.n)}}{${f.d}}`;
 }
-function multerm(k, name, lead=false){
+const texVec = v => `\\begin{pmatrix}${v.map(texF).join("\\\\")}\\end{pmatrix}`;
+function texMatrix(M){
+  const head = "s & t & u & v & = \\\\ \\hline ";
+  const rows = M.map(r=>`${r.slice(0,4).map(texF).join(" & ")} & ${texF(r[4])}`).join(" \\\\ ");
+  return `\\left[\\begin{array}{rrrr|r} ${head}${rows} \\end{array}\\right]`;
+}
+function texMul(k, name, lead=false){ // k * Bezeichner (z.B. Gl.2)
   let s;
   if(k.eq(F1)) s=name;
   else if(k.eq(F1.neg())) s="-"+name;
-  else s=`${fmt(k)}*${name}`;
+  else s=`${texF(k)}\\cdot ${name}`;
   if(lead) return (k.gt0()? "+ ":"- ") + (s.startsWith("-")?s.slice(1):s);
   return s;
 }
-function exprStr(e){ // e=[const, rFaktor]
+function texExpr(e, name="r"){ // e=[Konstante, Faktor vor der freien Variable]
   const [cst,r]=e;
-  if(r.isZero()) return fmt(cst);
+  if(r.isZero()) return texF(cst);
   const ra = r.gt0()? r : r.neg();
-  const rmag = ra.eq(F1) ? "r" : `${fmt(ra)}*r`;
+  const rmag = ra.eq(F1) ? name : `${texF(ra)}\\,${name}`;
   if(cst.isZero()) return (r.gt0()?"":"-")+rmag;
-  return `${fmt(cst)} ${r.gt0()?"+":"-"} ${rmag}`;
+  return `${texF(cst)} ${r.gt0()?"+":"-"} ${rmag}`;
 }
 
 /* ---------- Vektor-Helfer ---------- */
-const vsub=(a,b)=>a.map((x,i)=>x.sub(b[i]));
 function rowGcd(row){ // ggT, 0 falls nicht ganzzahlig
   let g=0n;
   for(const x of row){ if(x.d!==1n) return 0n; g=bgcd(g, x.n<0n?-x.n:x.n); }
@@ -180,22 +179,21 @@ function solve(P,a,b,Q,c,d){
   const geo={type:"none", planes:{P,a,b,Q,c,d}};
 
   add("head","Aufgabe");
-  add("text",`E1:  x = ${fmtVec(P)} + s*${fmtVec(a)} + t*${fmtVec(b)}\n`+
-             `E2:  x = ${fmtVec(Q)} + u*${fmtVec(c)} + v*${fmtVec(d)}`);
+  add("text",`\\(E_1:\\ \\vec x = ${texVec(P)} + s\\,${texVec(a)} + t\\,${texVec(b)}\\)\n`+
+             `\\(E_2:\\ \\vec x = ${texVec(Q)} + u\\,${texVec(c)} + v\\,${texVec(d)}\\)`);
   add("head","Schritt 1 – Ebenen gleichsetzen");
-  add("text","P + s*a + t*b = Q + u*c + v*d\n"+
+  add("text","\\(\\vec P + s\\,\\vec a + t\\,\\vec b = \\vec Q + u\\,\\vec c + v\\,\\vec d\\)\n"+
              "Unbekannte nach links, Konstanten nach rechts:\n"+
-             "   s*a + t*b - u*c - v*d = Q - P\n"+
-             `Q - P = ${fmtVec(Q)} - ${fmtVec(P)} = ${fmtVec(vsub(Q,P))}`);
+             "\\(s\\,\\vec a + t\\,\\vec b - u\\,\\vec c - v\\,\\vec d = \\vec Q - \\vec P\\)");
 
   let M=[0,1,2].map(i=>[a[i],b[i],c[i].neg(),d[i].neg(),Q[i].sub(P[i])]);
   add("head","Schritt 2 – Gleichungssystem (3 Gleichungen, Unbekannte s,t,u,v)");
   add("text","Spalten = Koeffizienten von s, t, u, v ; rechts die Konstante:");
-  add("mat",fmtMatrix(M));
+  add("mat",texMatrix(M));
 
   add("head","Schritt 3 – Variablen eliminieren (Additionsverfahren)");
   add("text","Wir kombinieren ganze Gleichungen, sodass je eine Variable wegfällt.\n"+
-             "Nur ganzzahlige Vielfache, kein Teilen, keine Pivotsuche.");
+             "Nur ganzzahlige Vielfache, kein Teilen.");
 
   const names=["s","t","u","v"]; const lead=[]; let srow=0;
   for(let col=0; col<4; col++){
@@ -203,32 +201,28 @@ function solve(P,a,b,Q,c,d){
     if(r<0) continue;
     if(r!==srow){ [M[srow],M[r]]=[M[r],M[srow]];
       add("text",`Gl.${srow+1} und Gl.${r+1} tauschen, damit '${names[col]}' in Gl.${srow+1} vorkommt:`);
-      add("mat",fmtMatrix(M)); }
+      add("mat",texMatrix(M)); }
     for(let i=srow+1;i<3;i++){
       if(!M[i][col].isZero()){
         const n=M[srow][col], m=M[i][col];
         M[i]=M[i].map((x,k)=> n.mul(M[i][k]).sub(m.mul(M[srow][k])));
-        add("text",`Gl.${i+1} := ${multerm(n,`Gl.${i+1}`)} ${multerm(m.neg(),`Gl.${srow+1}`,true)}   => '${names[col]}' fällt weg`);
+        add("text",`\\(\\text{Gl.}${i+1} := ${texMul(n,`\\text{Gl.}${i+1}`)} ${texMul(m.neg(),`\\text{Gl.}${srow+1}`,true)}\\)   ⟹ '${names[col]}' fällt weg`);
         const g=rowGcd(M[i]);
         if(g>1n){ M[i]=M[i].map(x=>x.div(new Frac(g,1n))); add("text",`Gl.${i+1} durch ${g} kürzen.`); }
-        add("mat",fmtMatrix(M));
+        add("mat",texMatrix(M));
       }
     }
     lead.push([col,srow]); srow++; if(srow===3) break;
   }
-  add("text","Umgeformtes System (Stufenform):");
-  add("mat",fmtMatrix(M));
-
   for(let i=0;i<3;i++){
     if(M[i].slice(0,4).every(x=>x.isZero()) && !M[i][4].isZero()){
-      add("head","Ergebnis");
-      add("res",`Gl.${i+1} ergibt 0 = ${fmt(M[i][4])}  ->  Widerspruch.\nDie Ebenen sind echt parallel, es gibt KEINEN Schnitt.`);
-      return {steps,geo};
+      return {steps,geo}; // ponytail: endet an Stufenform, Deutung den SuS überlassen
     }
   }
 
   const leadCols=lead.map(x=>x[0]);
   const free=[0,1,2,3].filter(j=>!leadCols.includes(j));
+  let freeName="r"; // im Geraden-Fall der Name der freien Variable (z.B. "v")
 
   function backSub(){
     const sol={}; for(const j of free) sol[j]=[F0,F1];
@@ -238,42 +232,35 @@ function solve(P,a,b,Q,c,d){
       for(let j=0;j<4;j++){ if(j!==col && !M[row][j].isZero()){
         const xj=sol[j]; acc=[acc[0].sub(M[row][j].mul(xj[0])), acc[1].sub(M[row][j].mul(xj[1]))]; } }
       sol[col]=[acc[0].div(pv), acc[1].div(pv)];
-      add("text",`Gl.${row+1} nach '${names[col]}' auflösen:  ${names[col]} = ${exprStr(sol[col])}`);
+      add("text",`Gl.${row+1} nach '${names[col]}' auflösen:  \\(${names[col]} = ${texExpr(sol[col],freeName)}\\)`);
     }
     return [0,1,2,3].map(j=>sol[j]);
   }
 
   if(free.length===0){
+    add("head","Schritt 4 – rückwärts einsetzen");
     const sol=backSub(); const s0=sol[0][0], t0=sol[1][0];
     const pt=[0,1,2].map(i=>P[i].add(s0.mul(a[i])).add(t0.mul(b[i])));
-    add("head","Schritt 5 – in E1 einsetzen");
-    add("text",`x = P + s*a + t*b  mit s = ${fmt(s0)}, t = ${fmt(t0)}\nx = ${fmtVec(pt)}`);
-    add("head","Ergebnis"); add("res",`Genau ein gemeinsamer Punkt:  ${fmtVec(pt)}`);
     geo.type="point"; geo.point=pt.map(x=>x.num());
     return {steps,geo};
   }
   if(free.length>=2){
-    add("head","Ergebnis"); add("res","Zwei freie Parameter -> die Ebenen sind identisch (ganze Ebene).");
-    geo.type="plane"; return {steps,geo};
+    geo.type="plane"; return {steps,geo}; // ponytail: Deutung den SuS überlassen
   }
 
   const fv=free[0];
+  freeName=names[fv];
+  const [bcol,brow]=lead[lead.length-1]; // unterste Leitgleichung
   add("head","Schritt 4 – rückwärts einsetzen");
-  add("text",`'${names[fv]}' wird von keiner Gleichung gebunden -> frei wählbar.\n`+
-             `Setze '${names[fv]}' = r. Jede andere Variable: [Konstante] + [Faktor]*r.`);
+  add("text",`In Gl.${brow+1} steht jetzt eine Gleichung mit nur noch zwei Variablen (\\(${names[bcol]}\\) und \\(${freeName}\\)).\n`+
+             `Wir bestimmen \\(${names[bcol]}\\) in Abhängigkeit von \\(${freeName}\\) und setzen dann nach oben ein.`);
   const sol=backSub();
   add("text","Zusammengefasst:\n"+
-             `   s = ${exprStr(sol[0])}\n   t = ${exprStr(sol[1])}\n`+
-             `   u = ${exprStr(sol[2])}\n   v = ${exprStr(sol[3])}`);
+             [0,1,2,3].map(j=> j===fv ? `\\(${names[j]}\\ \\text{frei wählbar}\\)`
+                                      : `\\(${names[j]} = ${texExpr(sol[j],freeName)}\\)`).join("\n"));
   const stuetz=[0,1,2].map(i=>P[i].add(sol[0][0].mul(a[i])).add(sol[1][0].mul(b[i])));
   const richtung=[0,1,2].map(i=>sol[0][1].mul(a[i]).add(sol[1][1].mul(b[i])));
   const rc=cleanDir(richtung);
-  add("head","Schritt 5 – in E1 einsetzen");
-  add("text","x = P + s*a + t*b , s und t durch r ersetzen:\n"+
-             `Stützvektor (r=0):       ${fmtVec(stuetz)}\n`+
-             `Richtung (Faktor vor r): ${fmtVec(richtung)}  ->  gekürzt ${fmtVec(rc)}`);
-  add("head","Ergebnis – Schnittgerade");
-  add("res",`g:  x = ${fmtVec(stuetz)} + r * ${fmtVec(rc)}`);
   geo.type="line"; geo.stuetz=stuetz.map(x=>x.num()); geo.richtung=rc.map(x=>x.num());
   return {steps,geo};
 }
@@ -282,23 +269,42 @@ function solve(P,a,b,Q,c,d){
 const $=id=>document.getElementById(id);
 const keys=["P","a","b","Q","c","d"];
 function readVec(k){ return [0,1,2].map(i=>Frac.parse($(k+i).value)); }
-function setEx(){
-  const ex={P:[1,1,-1],a:[1,0,2],b:[0,2,0],Q:[0,-1,1],c:[-1,2,-1],d:[-1,4,2]};
-  for(const k of keys) ex[k].forEach((v,i)=> $(k+i).value=v);
+const presets=[
+  {P:[1,1,-1], a:[1,0,2],  b:[0,2,0],  Q:[0,-1,1], c:[-1,2,-1], d:[-1,4,2]},
+  {P:[4,1,4],  a:[2,1,0],  b:[-1,0,3], Q:[2,0,4],  c:[1,1,3],   d:[5,2,-3]},
+  {P:[-1,2,2], a:[1,0,-2], b:[2,-1,3], Q:[3,-1,-2],c:[3,-1,1],  d:[1,-1,5]},
+];
+function setEx(i=0){
+  const ex=presets[i];
+  for(const k of keys) ex[k].forEach((v,j)=> $(k+j).value=v);
 }
 
-const state={steps:[],shown:0,geo:null};
+const state={groups:[],shown:0,geo:null};
 
+// Eine Überschrift wird zusammen mit ihrem folgenden Erklärtext als ein Schritt aufgedeckt.
+function groupSteps(steps){
+  const g=[];
+  for(let i=0;i<steps.length;i++){
+    if(steps[i].kind==="head" && steps[i+1] && steps[i+1].kind==="text"){ g.push([steps[i],steps[i+1]]); i++; }
+    else g.push([steps[i]]);
+  }
+  return g;
+}
 function render(){
   const el=$("steps"); el.innerHTML="";
-  const n=state.steps.length;
-  state.steps.slice(0,state.shown).forEach(s=>{
+  const n=state.groups.length;
+  state.groups.slice(0,state.shown).flat().forEach(s=>{
     const div=document.createElement("div");
     div.className = s.kind==="head"?"s-head":s.kind==="mat"?"s-mat":s.kind==="res"?"s-res":"s-text";
-    div.textContent=s.text; el.appendChild(div);
+    div.textContent = s.kind==="mat" ? `\\[${s.text}\\]` : s.text;
+    el.appendChild(div);
   });
+  if(window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([el]).catch(()=>{});
   el.scrollTop=el.scrollHeight;
   const done=state.shown>=n;
+  $("tab3d").classList.toggle("hidden", !done); // 3D-Tab erst am Ende
+  if(!done){ $("tab3d").classList.remove("active"); document.querySelector('.tab[data-tab="steps"]').classList.add("active");
+    $("steps").classList.remove("hidden"); $("view3d").classList.add("hidden"); }
   $("nextBtn").disabled=done;
   $("nextBtn").textContent = done? "Fertig ✓" : `Nächster Schritt (${state.shown}/${n})`;
   if(done && state.geo){ geo3d=state.geo; drawGeo(); }
@@ -309,15 +315,14 @@ function doSolve(){
   try{ P=readVec("P");a=readVec("a");b=readVec("b");Q=readVec("Q");c=readVec("c");d=readVec("d"); }
   catch(e){ alert("Bitte alle 18 Felder ausfüllen (z.B. 1, -2, 1/2)."); return; }
   const {steps,geo}=solve(P,a,b,Q,c,d);
-  state.steps=steps; state.geo=geo;
-  state.shown = $("helpMode").checked ? 0 : steps.length;
+  state.groups=groupSteps(steps); state.geo=geo;
+  state.shown = $("helpMode").checked ? 0 : state.groups.length;
   render();
 }
 $("solveBtn").onclick=doSolve;
-$("exBtn").onclick=()=>{ setEx(); doSolve(); };
+$("presetSel").onchange=()=>{ setEx(+$("presetSel").value); doSolve(); };
 $("helpMode").onchange=doSolve;
-$("nextBtn").onclick=()=>{ if(state.shown<state.steps.length){ state.shown++; render(); } };
-$("allBtn").onclick=()=>{ state.shown=state.steps.length; render(); };
+$("nextBtn").onclick=()=>{ if(state.shown<state.groups.length){ state.shown++; render(); } };
 
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
