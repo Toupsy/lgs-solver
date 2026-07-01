@@ -1,20 +1,43 @@
-# Schnitt zweier Ebenen (Parameterform)
+# Ebenen-Werkzeug: Schnitt, Lagebeziehung, Darstellungsformen
 
-Webtool, das den Schnitt zweier in Parameterform gegebener Ebenen berechnet –
-mit vollständigem Rechenweg (Additionsverfahren, exakte Bruchrechnung) und
-drehbarer 3D-Ansicht. Gedacht für den Mathematikunterricht.
+Webtool für die analytische Geometrie im Mathematikunterricht. Drei Werkzeuge,
+umschaltbar über die Leiste oben, alle mit vollständigem Rechenweg (exakte
+Bruchrechnung, LaTeX/MathJax) und einem Hilfe-Modus zum schrittweisen Aufdecken.
+
+## Werkzeug 1 – Ebenenschnitt
+Schnitt zweier in Parameterform gegebener Ebenen mit Additionsverfahren und
+drehbarer 3D-Ansicht.
 
 **E1:** x = P + s·a + t·b  **E2:** x = Q + u·c + v·d
 
-## Funktionen
 - Rechenweg in echter Mathematik-Schrift (LaTeX/MathJax): Vektoren als
   Spaltenvektoren, Brüche als Bruch, das LGS als augmentierte Matrix.
 - Exakte Rechnung mit Brüchen (kein Rundungsfehler), bleibt möglichst ganzzahlig.
 - Lösung als Additionsverfahren – ganze Gleichungen kombinieren, keine Pivotsuche.
-- **Hilfe-Modus:** Rechenschritte einzeln aufdecken zum Selber-Lösen.
 - **Aufgaben-Presets:** drei Knöpfe laden vorher eingestellte Aufgabenwerte direkt in die Eingabefelder.
 - **3D-Ansicht:** beide Ebenen + Schnittgerade/-punkt, mit Maus oder Finger drehbar, Zoom per Scrollen/Pinch.
 - Fälle: Schnittgerade, einzelner Schnittpunkt, identische Ebenen, echt parallel.
+
+## Werkzeug 2 – Lagebeziehung
+Bestimmt die gegenseitige Lage – als Hilfestellung mit erklärtem Rechenweg.
+- **Ebene & Ebene** (beide in Koordinatenform): Normalenvektoren über das
+  Kreuzprodukt vergleichen → schneidend (mit Schnittgerade), echt parallel oder
+  identisch. Bei Schnitt werden Richtungsvektor und Aufpunkt der Schnittgeraden
+  bestimmt.
+- **Ebene & Gerade** (Ebene in Koordinatenform, Gerade in Parameterform): Gerade
+  in die Ebenengleichung einsetzen → Schnittpunkt (genau eine Lösung), Gerade
+  liegt in der Ebene oder echt parallel.
+
+## Werkzeug 3 – Darstellungsformen
+Zeigt systematisch, wie man zwischen den Formen einer Ebenengleichung wechselt:
+**Parameterform ↔ Normalenform ↔ Koordinatenform.** Man gibt eine Form ein, die
+beiden anderen werden mit Rechenweg erzeugt (Normalenvektor per Kreuzprodukt,
+Aufpunkt und Spannvektoren senkrecht zum Normalenvektor, Aus- bzw. Ablesen der
+Koordinatenform).
+
+## Gemeinsame Funktionen
+- **Hilfe-Modus:** Rechenschritte einzeln aufdecken zum Selber-Lösen (in allen drei Werkzeugen).
+- Exakte Bruchrechnung, Eingaben als ganze Zahlen oder Brüche wie `1/2`.
 
 ## Nutzung
 Einfach `index.html` im Browser öffnen – keine Installation, kein Server nötig.

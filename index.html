@@ -3,18 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Schnitt zweier Ebenen (Parameterform)</title>
+<title>Ebenen-Werkzeug: Schnitt, Lagebeziehung, Darstellungsformen</title>
 <style>
   :root { --blau:#4a90d9; --blaudk:#1c5a96; --rot:#d9534f; --rotdk:#9c2b27;
           --gruen:#1a7d33; --bg:#f4f4f4; --karte:#fff; }
   * { box-sizing: border-box; }
   body { margin:0; font-family:"Segoe UI",system-ui,sans-serif; background:var(--bg); color:#222; }
   h1 { font-size:1.2rem; margin:0 0 .6rem; }
+  .topnav { display:flex; gap:8px; padding:14px 16px 0; flex-wrap:wrap; }
+  .topnav button { background:#e6e6e6; color:#222; font-weight:600; padding:9px 14px;
+                   border:none; border-radius:8px; cursor:pointer; font-size:.95rem; }
+  .topnav button.active { background:var(--blau); color:#fff; }
   .wrap { display:flex; gap:16px; padding:16px; flex-wrap:wrap; align-items:flex-start; }
   .panel { background:var(--karte); border-radius:10px; padding:14px 16px;
            box-shadow:0 1px 4px rgba(0,0,0,.08); }
-  .inputs { width:300px; flex:0 0 auto; }
+  .inputs { width:320px; flex:0 0 auto; }
   .right { flex:1 1 460px; min-width:340px; }
+  .intro { font-size:.85rem; color:#555; margin:.2rem 0 .8rem; line-height:1.35; }
   .eq-title { font-weight:600; margin:.6rem 0 .3rem; }
   .eq-title.e1 { color:var(--blaudk); } .eq-title.e2 { color:var(--rotdk); }
   .vrow { display:grid; grid-template-columns:120px repeat(3,1fr); gap:6px;
@@ -22,9 +27,15 @@
   .vrow label { font-size:.9rem; }
   .vrow input { width:100%; padding:5px; text-align:center; border:1px solid #ccc;
                 border-radius:5px; font-size:.95rem; }
+  .koordline { display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:.95rem;
+               margin:6px 0; }
+  .koordline input { width:56px; padding:5px; text-align:center; border:1px solid #ccc;
+                     border-radius:5px; font-size:.95rem; }
+  select { padding:6px; border:1px solid #ccc; border-radius:5px; font-size:.9rem; width:100%; }
+  .field { margin-bottom:10px; }
+  .field > label { display:block; font-size:.85rem; font-weight:600; margin-bottom:4px; }
   .hint { color:#888; font-size:.8rem; margin:.4rem 0 0; }
-  button { border:none; border-radius:6px; padding:8px 12px; cursor:pointer;
-           font-size:.9rem; }
+  button { border:none; border-radius:6px; padding:8px 12px; cursor:pointer; font-size:.9rem; }
   .primary { background:var(--blau); color:#fff; }
   .go { background:var(--gruen); color:#fff; }
   .ghost { background:#e6e6e6; }
@@ -37,7 +48,7 @@
   .tabs { display:flex; gap:4px; margin-bottom:10px; }
   .tab { padding:7px 14px; border-radius:8px 8px 0 0; background:#e6e6e6; cursor:pointer; }
   .tab.active { background:var(--karte); font-weight:600; box-shadow:0 -1px 3px rgba(0,0,0,.06); }
-  #steps { font-size:.95rem; line-height:1.4; max-height:62vh; overflow:auto; }
+  .steps { font-size:.95rem; line-height:1.4; max-height:62vh; overflow:auto; }
   .s-head { font-weight:700; color:var(--blaudk); margin:.9rem 0 .3rem; }
   .s-text { white-space:pre-wrap; margin:.2rem 0; }
   .s-mat  { background:#f0f4f8; padding:6px 10px; border-radius:6px;
@@ -60,9 +71,19 @@
 <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
-<div class="wrap">
+
+<div class="topnav" id="topnav">
+  <button data-mode="schnitt" class="active">Ebenenschnitt</button>
+  <button data-mode="lage">Lagebeziehung</button>
+  <button data-mode="darst">Darstellungsformen</button>
+</div>
+
+<!-- ================= Werkzeug 1: Ebenenschnitt ================= -->
+<div class="wrap" id="mode-schnitt">
   <div class="panel inputs">
     <h1>Schnitt zweier Ebenen</h1>
+    <p class="intro">Zwei Ebenen in Parameterform gleichsetzen und den Schnitt (Gerade, Punkt,
+      identisch oder parallel) mit vollem Rechenweg bestimmen.</p>
     <div class="eq-title e1">E1:  x = P + s·a + t·b</div>
     <div class="vrow"><label>P (Stütze)</label><input id="P0"><input id="P1"><input id="P2"></div>
     <div class="vrow"><label>a (Richtung 1)</label><input id="a0"><input id="a1"><input id="a2"></div>
@@ -96,11 +117,117 @@
       <div class="tab active" data-tab="steps">Rechenweg</div>
       <div class="tab hidden" id="tab3d" data-tab="view3d">3D-Ansicht</div>
     </div>
-    <div id="steps"></div>
+    <div id="steps" class="steps"></div>
     <div id="view3d" class="hidden">
       <canvas id="cv" width="560" height="440"></canvas>
       <div class="canvas-hint">Mit Maus ziehen (oder Finger wischen) zum Drehen. Scrollen/Pinch zum Zoomen.</div>
     </div>
+  </div>
+</div>
+
+<!-- ================= Werkzeug 2: Lagebeziehung ================= -->
+<div class="wrap hidden" id="mode-lage">
+  <div class="panel inputs">
+    <h1>Lagebeziehung bestimmen</h1>
+    <p class="intro">Untersucht die Lage von Ebene&nbsp;&amp;&nbsp;Ebene oder Ebene&nbsp;&amp;&nbsp;Gerade.
+      Ebenen bitte in Koordinatenform eingeben. Liegt eine Ebene in Parameterform vor, zuerst über den
+      Reiter „Darstellungsformen“ umwandeln.</p>
+    <div class="field">
+      <label>Was soll untersucht werden?</label>
+      <select id="lbMode">
+        <option value="ee">Ebene &amp; Ebene</option>
+        <option value="eg">Ebene &amp; Gerade</option>
+      </select>
+    </div>
+
+    <div id="lb-ee">
+      <div class="eq-title e1">Ebene E1 (Koordinatenform)</div>
+      <div class="koordline">
+        <input id="lbE1a">·x +<input id="lbE1b">·y +<input id="lbE1c">·z =<input id="lbE1d">
+      </div>
+      <div class="eq-title e2">Ebene E2 (Koordinatenform)</div>
+      <div class="koordline">
+        <input id="lbE2a">·x +<input id="lbE2b">·y +<input id="lbE2c">·z =<input id="lbE2d">
+      </div>
+    </div>
+
+    <div id="lb-eg" class="hidden">
+      <div class="eq-title e1">Ebene E (Koordinatenform)</div>
+      <div class="koordline">
+        <input id="lbPa">·x +<input id="lbPb">·y +<input id="lbPc">·z =<input id="lbPd">
+      </div>
+      <div class="eq-title e2">Gerade g:  x = A + r·u</div>
+      <div class="vrow"><label>A (Stütze)</label><input id="lbA0"><input id="lbA1"><input id="lbA2"></div>
+      <div class="vrow"><label>u (Richtung)</label><input id="lbU0"><input id="lbU1"><input id="lbU2"></div>
+    </div>
+
+    <p class="hint">Ganze Zahlen oder Brüche wie 1/2 (Dezimal mit . oder , geht auch).</p>
+    <div class="btns">
+      <button class="primary" id="lbBtn">Bestimmen</button>
+    </div>
+    <div class="helpbar">
+      <label><input type="checkbox" id="lbHelp" checked> Hilfe-Modus (Schritte einzeln)</label>
+    </div>
+    <div class="helpbar">
+      <button class="go" id="lbNext">Nächster Schritt</button>
+    </div>
+  </div>
+  <div class="panel right">
+    <div class="tabs"><div class="tab active">Rechenweg</div></div>
+    <div id="lbSteps" class="steps"></div>
+  </div>
+</div>
+
+<!-- ================= Werkzeug 3: Darstellungsformen ================= -->
+<div class="wrap hidden" id="mode-darst">
+  <div class="panel inputs">
+    <h1>Darstellungsformen umwandeln</h1>
+    <p class="intro">Systematischer Wechsel zwischen den Formen einer Ebenengleichung:
+      Parameterform ↔ Normalenform ↔ Koordinatenform. Gib eine Form ein – die anderen beiden
+      werden mit Rechenweg erzeugt.</p>
+    <div class="field">
+      <label>Gegebene Form</label>
+      <select id="dfForm">
+        <option value="param">Parameterform</option>
+        <option value="normal">Normalenform</option>
+        <option value="koord">Koordinatenform</option>
+      </select>
+    </div>
+
+    <div id="df-param">
+      <div class="eq-title e1">x = P + s·u + t·v</div>
+      <div class="vrow"><label>P (Aufpunkt)</label><input id="dfP0"><input id="dfP1"><input id="dfP2"></div>
+      <div class="vrow"><label>u (Spann 1)</label><input id="dfU0"><input id="dfU1"><input id="dfU2"></div>
+      <div class="vrow"><label>v (Spann 2)</label><input id="dfV0"><input id="dfV1"><input id="dfV2"></div>
+    </div>
+
+    <div id="df-normal" class="hidden">
+      <div class="eq-title e1">(x − P) · n = 0</div>
+      <div class="vrow"><label>P (Aufpunkt)</label><input id="dfNP0"><input id="dfNP1"><input id="dfNP2"></div>
+      <div class="vrow"><label>n (Normale)</label><input id="dfN0"><input id="dfN1"><input id="dfN2"></div>
+    </div>
+
+    <div id="df-koord" class="hidden">
+      <div class="eq-title e1">a·x + b·y + c·z = d</div>
+      <div class="koordline">
+        <input id="dfKa">·x +<input id="dfKb">·y +<input id="dfKc">·z =<input id="dfKd">
+      </div>
+    </div>
+
+    <p class="hint">Ganze Zahlen oder Brüche wie 1/2 (Dezimal mit . oder , geht auch).</p>
+    <div class="btns">
+      <button class="primary" id="dfBtn">Umwandeln</button>
+    </div>
+    <div class="helpbar">
+      <label><input type="checkbox" id="dfHelp" checked> Hilfe-Modus (Schritte einzeln)</label>
+    </div>
+    <div class="helpbar">
+      <button class="go" id="dfNext">Nächster Schritt</button>
+    </div>
+  </div>
+  <div class="panel right">
+    <div class="tabs"><div class="tab active">Rechenweg &amp; alle drei Formen</div></div>
+    <div id="dfSteps" class="steps"></div>
   </div>
 </div>
 
@@ -144,6 +271,19 @@ class Frac {
 const F0 = new Frac(0n), F1 = new Frac(1n);
 const Fi = (x)=> new Frac(BigInt(x));
 
+/* ---------- Vektor-Helfer (Frac-Vektoren) ---------- */
+const Vsub  = (a,b)=>[0,1,2].map(i=>a[i].sub(b[i]));
+const Vadd  = (a,b)=>[0,1,2].map(i=>a[i].add(b[i]));
+const Vscale= (a,k)=>a.map(x=>x.mul(k));
+const Vdot  = (a,b)=>a[0].mul(b[0]).add(a[1].mul(b[1])).add(a[2].mul(b[2]));
+const Vcross= (a,b)=>[
+  a[1].mul(b[2]).sub(a[2].mul(b[1])),
+  a[2].mul(b[0]).sub(a[0].mul(b[2])),
+  a[0].mul(b[1]).sub(a[1].mul(b[0]))
+];
+const Vzero = v=>v.every(x=>x.isZero());
+const Veq   = (a,b)=>[0,1,2].every(i=>a[i].eq(b[i]));
+
 /* ---------- Formatierung (LaTeX) ---------- */
 const fmt = f => f.toString();
 // Bruch/Ganzzahl als LaTeX-Term
@@ -153,6 +293,8 @@ function tex(f){
   const n = (neg?-f.n:f.n).toString();
   return (neg?"-":"") + `\\tfrac{${n}}{${f.d}}`;
 }
+// negative/gebrochene Werte in Klammern (für Produkte)
+const par = f => (f.n<0n) ? `\\left(${tex(f)}\\right)` : tex(f);
 // Spaltenvektor
 const texVec = v => `\\begin{pmatrix} ${v.map(tex).join(" \\\\ ")} \\end{pmatrix}`;
 // augmentierte Matrix mit Spaltenkoepfen s t u v | rhs (fertiger Display-Block)
@@ -184,8 +326,34 @@ function texPlane(name,p,dirs,params){
   dirs.forEach((dv,i)=> s += ` + ${params[i]}\\,${texVec(dv)}`);
   return s;
 }
+// Linearkombination a·x + b·y + c·z (mit korrekten Vorzeichen)
+function texLinComb(coefs, names){
+  let out="";
+  coefs.forEach((c,i)=>{
+    if(c.isZero()) return;
+    const first = out==="";
+    const neg = !c.gt0();
+    const mag = neg? c.neg() : c;
+    const term = mag.eq(F1) ? names[i] : `${tex(mag)}${names[i]}`;
+    out += first ? (neg?"-":"")+term : (neg?" - ":" + ")+term;
+  });
+  return out===""? "0" : out;
+}
+// Skalarprodukt als ausgeschriebene Summe
+const dotTex = (a,b)=>[0,1,2].map(i=>`${par(a[i])}\\cdot ${par(b[i])}`).join(" + ");
+// Kreuzprodukt als ausgeschriebener Vektor
+function crossTex(u,v){
+  const rows=[
+    `${par(u[1])}\\cdot ${par(v[2])} - ${par(u[2])}\\cdot ${par(v[1])}`,
+    `${par(u[2])}\\cdot ${par(v[0])} - ${par(u[0])}\\cdot ${par(v[2])}`,
+    `${par(u[0])}\\cdot ${par(v[1])} - ${par(u[1])}\\cdot ${par(v[0])}`
+  ];
+  return `\\begin{pmatrix} ${rows.join(" \\\\ ")} \\end{pmatrix}`;
+}
+// Koordinatenform-Term "a x + b y + c z = d"
+const texKoord = (n,d)=> `${texLinComb(n,["x","y","z"])} = ${tex(d)}`;
 
-/* ---------- Vektor-Helfer ---------- */
+/* ---------- Vektor-Helfer (Ganzzahl kürzen) ---------- */
 function rowGcd(row){ // ggT, 0 falls nicht ganzzahlig
   let g=0n;
   for(const x of row){ if(x.d!==1n) return 0n; g=bgcd(g, x.n<0n?-x.n:x.n); }
@@ -199,8 +367,16 @@ function cleanDir(v){
   for(const n of ints){ if(n!==0n){ if(n<0n) ints=ints.map(m=>-m); break; } }
   return ints.map(n=>new Frac(n,1n));
 }
+// Aufpunkt + zwei Spannvektoren aus Normalenvektor n und Konstante d (n·x = d)
+function paramFromNormal(n, d){
+  const pivot = n.findIndex(x=>!x.isZero());
+  const others = [0,1,2].filter(i=>i!==pivot);
+  const P=[F0,F0,F0]; P[pivot]=d.div(n[pivot]);
+  const mk = k => { const w=[F0,F0,F0]; w[k]=n[pivot]; w[pivot]=n[k].neg(); return cleanDir(w); };
+  return { P, u:mk(others[0]), v:mk(others[1]), pivot, others };
+}
 
-/* ---------- Löser mit Protokoll ---------- */
+/* ---------- Löser mit Protokoll (Ebenenschnitt) ---------- */
 function solve(P,a,b,Q,c,d){
   const steps=[]; const add=(kind,text)=>steps.push({kind,text});
   const geo={type:"none", planes:{P,a,b,Q,c,d}};
@@ -294,8 +470,177 @@ function solve(P,a,b,Q,c,d){
   return {steps,geo};
 }
 
-/* ---------- UI ---------- */
+/* ================= Darstellungsformen umwandeln ================= */
+function darstSolve(){
+  const form=$("dfForm").value;
+  const steps=[]; const add=(k,t)=>steps.push({kind:k,text:t});
+  const fail=msg=>{ add("head","Eingabe prüfen"); add("text",msg); darstRunner.run(steps); };
+
+  let P,u,v,n,d;
+  try{
+    if(form==="param"){
+      P=rv(["dfP0","dfP1","dfP2"]); u=rv(["dfU0","dfU1","dfU2"]); v=rv(["dfV0","dfV1","dfV2"]);
+      n=Vcross(u,v);
+      if(Vzero(n)){ return fail("Die beiden Spannvektoren sind parallel (Kreuzprodukt = 0) – sie legen keine Ebene fest."); }
+      d=Vdot(n,P);
+      add("head","Gegeben – Parameterform");
+      add("text",`\\[\\vec x = ${texVec(P)} + s\\,${texVec(u)} + t\\,${texVec(v)}\\]`);
+      add("head","Schritt 1 – Normalenvektor (Parameterform → Normalenform)");
+      add("text","Der Normalenvektor steht senkrecht auf beiden Spannvektoren, also über das Kreuzprodukt:\n"+
+        `\\[\\vec n = ${texVec(u)} \\times ${texVec(v)} = ${crossTex(u,v)} = ${texVec(n)}\\]`);
+      add("head","Schritt 2 – Normalenform");
+      add("text",`Aufpunkt \\(P\\) und Normalenvektor \\(\\vec n\\) einsetzen:\n`+
+        `\\[\\left(\\vec x - ${texVec(P)}\\right)\\cdot ${texVec(n)} = 0\\]`);
+      add("head","Schritt 3 – Koordinatenform (Normalenform → Koordinatenform)");
+      add("text","Ausmultiplizieren liefert \\(\\vec n\\cdot\\vec x = \\vec n\\cdot P\\). Die rechte Seite:\n"+
+        `\\[\\vec n\\cdot P = ${dotTex(n,P)} = ${tex(d)}\\]`+
+        `\\[${texKoord(n,d)}\\]`);
+    }
+    else if(form==="normal"){
+      P=rv(["dfNP0","dfNP1","dfNP2"]); n=rv(["dfN0","dfN1","dfN2"]);
+      if(Vzero(n)){ return fail("Der Normalenvektor darf nicht der Nullvektor sein."); }
+      d=Vdot(n,P);
+      add("head","Gegeben – Normalenform");
+      add("text",`\\[\\left(\\vec x - ${texVec(P)}\\right)\\cdot ${texVec(n)} = 0\\]`);
+      add("head","Schritt 1 – Koordinatenform (Normalenform → Koordinatenform)");
+      add("text","Ausmultiplizieren: \\(\\vec n\\cdot\\vec x = \\vec n\\cdot P\\). Rechte Seite:\n"+
+        `\\[\\vec n\\cdot P = ${dotTex(n,P)} = ${tex(d)}\\]`+
+        `\\[${texKoord(n,d)}\\]`);
+      const pf=paramFromNormal(n,d); u=pf.u; v=pf.v;
+      add("head","Schritt 2 – Parameterform (Normalenform → Parameterform)");
+      add("text","Wir brauchen zwei Spannvektoren, die senkrecht auf \\(\\vec n\\) stehen (also \\(\\vec n\\cdot\\vec u = 0\\) und \\(\\vec n\\cdot\\vec v = 0\\)). "+
+        "Als Aufpunkt genügt der gegebene Punkt \\(P\\):\n"+
+        `\\[\\vec x = ${texVec(P)} + s\\,${texVec(u)} + t\\,${texVec(v)}\\]`);
+      // Aufpunkt für die Übersicht bleibt P
+    }
+    else { // koord
+      n=[rf("dfKa"),rf("dfKb"),rf("dfKc")]; d=rf("dfKd");
+      if(Vzero(n)){ return fail("Mindestens einer der Koeffizienten a, b, c muss ungleich 0 sein."); }
+      add("head","Gegeben – Koordinatenform");
+      add("text",`\\[${texKoord(n,d)}\\]`);
+      add("head","Schritt 1 – Normalenform (Koordinatenform → Normalenform)");
+      const pf=paramFromNormal(n,d); P=pf.P; u=pf.u; v=pf.v;
+      add("text","Der Normalenvektor lässt sich direkt ablesen: \\(\\vec n = "+texVec(n)+"\\).\n"+
+        `Als Aufpunkt eine Koordinate frei wählen: setze die übrigen auf 0, dann folgt \\(P = ${texVec(P)}\\).\n`+
+        `\\[\\left(\\vec x - ${texVec(P)}\\right)\\cdot ${texVec(n)} = 0\\]`);
+      add("head","Schritt 2 – Parameterform (Koordinatenform → Parameterform)");
+      add("text","Zwei Spannvektoren senkrecht zu \\(\\vec n\\) wählen (\\(\\vec n\\cdot\\vec u=0,\\ \\vec n\\cdot\\vec v=0\\)):\n"+
+        `\\[\\vec x = ${texVec(P)} + s\\,${texVec(u)} + t\\,${texVec(v)}\\]`);
+    }
+  } catch(e){ return fail("Bitte alle Felder ausfüllen (z.B. 1, -2, 1/2)."); }
+
+  // Zusammenfassung: alle drei Formen
+  add("head","Ergebnis – alle drei Darstellungsformen");
+  add("text","Die Ebene lässt sich gleichwertig so schreiben:");
+  add("res","Parameterform:");
+  add("text",`\\[\\vec x = ${texVec(P)} + s\\,${texVec(u)} + t\\,${texVec(v)}\\]`);
+  add("res","Normalenform:");
+  add("text",`\\[\\left(\\vec x - ${texVec(P)}\\right)\\cdot ${texVec(n)} = 0\\]`);
+  add("res","Koordinatenform:");
+  add("text",`\\[${texKoord(n,d)}\\]`);
+  darstRunner.run(steps);
+}
+
+/* ================= Lagebeziehung ================= */
+function lageSolve(){
+  const mode=$("lbMode").value;
+  const steps=[]; const add=(k,t)=>steps.push({kind:k,text:t});
+  const fail=msg=>{ add("head","Eingabe prüfen"); add("text",msg); lageRunner.run(steps); };
+
+  try{
+    if(mode==="eg"){ /* ----- Ebene & Gerade ----- */
+      const n=[rf("lbPa"),rf("lbPb"),rf("lbPc")], d=rf("lbPd");
+      const A=rv(["lbA0","lbA1","lbA2"]), u=rv(["lbU0","lbU1","lbU2"]);
+      if(Vzero(n)){ return fail("Die Ebene ist ungültig: a, b, c dürfen nicht alle 0 sein."); }
+      if(Vzero(u)){ return fail("Der Richtungsvektor der Geraden darf nicht der Nullvektor sein."); }
+
+      add("head","Gegeben");
+      add("text",`Ebene \\(E:\\ ${texKoord(n,d)}\\), also \\(\\vec n = ${texVec(n)}\\).`+
+        `\n\\[g:\\ \\vec x = ${texVec(A)} + r\\,${texVec(u)}\\]`);
+      add("head","Schritt 1 – Gerade in die Ebenengleichung einsetzen");
+      add("text","Wir setzen \\(\\vec x = \\vec A + r\\,\\vec u\\) in \\(\\vec n\\cdot\\vec x = d\\) ein:\n"+
+        `\\[\\vec n\\cdot\\left(${texVec(A)} + r\\,${texVec(u)}\\right) = ${tex(d)}\\]`);
+      const nA=Vdot(n,A), nu=Vdot(n,u);
+      add("head","Schritt 2 – nach r zusammenfassen");
+      add("text",`\\[\\underbrace{\\vec n\\cdot\\vec A}_{=\\,${tex(nA)}} + \\underbrace{(\\vec n\\cdot\\vec u)}_{=\\,${tex(nu)}}\\,r = ${tex(d)}\\]`+
+        `\\[${tex(nA)} + ${tex(nu)}\\,r = ${tex(d)}\\]`);
+
+      add("head","Ergebnis");
+      if(!nu.isZero()){
+        const r=d.sub(nA).div(nu);
+        const S=Vadd(A,Vscale(u,r));
+        add("text",`Da \\(\\vec n\\cdot\\vec u = ${tex(nu)} \\neq 0\\) ist, gibt es genau eine Lösung:\n`+
+          `\\[r = \\dfrac{d - \\vec n\\cdot\\vec A}{\\vec n\\cdot\\vec u} = \\dfrac{${tex(d)} - ${tex(nA)}}{${tex(nu)}} = ${tex(r)}\\]`+
+          `Einsetzen in \\(g\\) liefert den Schnittpunkt.`);
+        add("res",`Die Gerade schneidet die Ebene in genau einem Punkt.`);
+        add("text",`\\[S = ${texVec(A)} + ${par(r)}\\cdot ${texVec(u)} = ${texVec(S)}\\]`);
+      } else if(nA.eq(d)){
+        add("text",`Es ist \\(\\vec n\\cdot\\vec u = 0\\) (die Gerade verläuft parallel zur Ebene) und die Gleichung `+
+          `\\(${tex(nA)} = ${tex(d)}\\) ist für jedes \\(r\\) erfüllt.`);
+        add("res","Die Gerade liegt vollständig in der Ebene (unendlich viele gemeinsame Punkte).");
+      } else {
+        add("text",`Es ist \\(\\vec n\\cdot\\vec u = 0\\), aber \\(${tex(nA)} \\neq ${tex(d)}\\) – die Gleichung hat keine Lösung.`);
+        add("res","Die Gerade ist echt parallel zur Ebene (kein gemeinsamer Punkt).");
+      }
+    }
+    else { /* ----- Ebene & Ebene ----- */
+      const n1=[rf("lbE1a"),rf("lbE1b"),rf("lbE1c")], d1=rf("lbE1d");
+      const n2=[rf("lbE2a"),rf("lbE2b"),rf("lbE2c")], d2=rf("lbE2d");
+      if(Vzero(n1)||Vzero(n2)){ return fail("Beide Ebenen brauchen einen Normalenvektor ≠ 0 (a, b, c nicht alle 0)."); }
+
+      add("head","Gegeben");
+      add("text",`\\[E_1:\\ ${texKoord(n1,d1)} \\qquad \\vec n_1 = ${texVec(n1)}\\]`+
+        `\\[E_2:\\ ${texKoord(n2,d2)} \\qquad \\vec n_2 = ${texVec(n2)}\\]`);
+      add("head","Schritt 1 – Normalenvektoren vergleichen");
+      const cr=Vcross(n1,n2);
+      add("text","Sind die Normalenvektoren parallel? Test über das Kreuzprodukt:\n"+
+        `\\[\\vec n_1 \\times \\vec n_2 = ${crossTex(n1,n2)} = ${texVec(cr)}\\]`);
+
+      if(Vzero(cr)){
+        add("text","Das Kreuzprodukt ist der Nullvektor ⇒ \\(\\vec n_1\\) und \\(\\vec n_2\\) sind parallel, die Ebenen also parallel.");
+        add("head","Schritt 2 – identisch oder echt parallel?");
+        const {P}=paramFromNormal(n1,d1);
+        const lhs=Vdot(n2,P);
+        add("text",`Wir prüfen, ob ein Punkt von \\(E_1\\) auch in \\(E_2\\) liegt. Ein Punkt von \\(E_1\\) ist \\(P=${texVec(P)}\\).\n`+
+          `In \\(E_2\\) eingesetzt:\n\\[${dotTex(n2,P)} = ${tex(lhs)}\\quad(\\text{Soll: } ${tex(d2)})\\]`);
+        add("head","Ergebnis");
+        if(lhs.eq(d2)){
+          add("res","Die Ebenen sind identisch (sie fallen zusammen).");
+        } else {
+          add("res","Die Ebenen sind echt parallel (kein gemeinsamer Punkt, Abstand > 0).");
+        }
+      } else {
+        add("text","Das Kreuzprodukt ist nicht der Nullvektor ⇒ die Ebenen schneiden sich in einer Geraden.");
+        add("head","Schritt 2 – Richtungsvektor der Schnittgeraden");
+        const dir=cleanDir(cr);
+        add("text","Die Schnittgerade verläuft in Richtung des Kreuzprodukts (gekürzt):\n"+
+          `\\[\\vec v = ${texVec(dir)}\\]`);
+        add("head","Schritt 3 – einen Punkt der Schnittgeraden bestimmen");
+        // Koordinate wählen, deren cr-Komponente ≠ 0, auf 0 setzen und 2x2 lösen
+        const k=[0,1,2].find(i=>!cr[i].isZero());
+        const [i,j]=[0,1,2].filter(x=>x!==k);
+        const nm=["x","y","z"];
+        const det=n1[i].mul(n2[j]).sub(n1[j].mul(n2[i]));
+        const xi=d1.mul(n2[j]).sub(d2.mul(n1[j])).div(det);
+        const xj=n1[i].mul(d2).sub(n2[i].mul(d1)).div(det);
+        const Pt=[F0,F0,F0]; Pt[i]=xi; Pt[j]=xj;
+        add("text",`Setze \\(${nm[k]} = 0\\) und löse das 2×2-System aus \\(E_1\\) und \\(E_2\\):\n`+
+          `\\[\\begin{aligned} ${texLinComb([n1[i],n1[j]],[nm[i],nm[j]])} &= ${tex(d1)} \\\\ `+
+          `${texLinComb([n2[i],n2[j]],[nm[i],nm[j]])} &= ${tex(d2)} \\end{aligned}\\]`+
+          `\\[\\Rightarrow\\ ${nm[i]} = ${tex(xi)},\\quad ${nm[j]} = ${tex(xj)}\\quad\\Rightarrow\\quad P = ${texVec(Pt)}\\]`);
+        add("head","Ergebnis");
+        add("res","Die Ebenen schneiden sich in einer Schnittgeraden.");
+        add("text",`\\[g:\\ \\vec x = ${texVec(Pt)} + r\\,${texVec(dir)}\\]`);
+      }
+    }
+  } catch(e){ return fail("Bitte alle Felder ausfüllen (z.B. 1, -2, 1/2)."); }
+  lageRunner.run(steps);
+}
+
+/* ---------- UI-Grundlagen ---------- */
 const $=id=>document.getElementById(id);
+const rv=ids=>ids.map(id=>Frac.parse($(id).value));
+const rf=id=>Frac.parse($(id).value);
 function typeset(el){
   if(window.MathJax && window.MathJax.typesetPromise){
     if(window.MathJax.typesetClear) window.MathJax.typesetClear([el]);
@@ -303,6 +648,56 @@ function typeset(el){
       .catch(()=>{});
   }
 }
+// Überschrift + folgender Erklärtext bilden zusammen einen aufdeckbaren Schritt.
+function groupSteps(steps){
+  const g=[];
+  for(let i=0;i<steps.length;i++){
+    if(steps[i].kind==="head" && steps[i+1] && steps[i+1].kind==="text"){ g.push([steps[i],steps[i+1]]); i++; }
+    else g.push([steps[i]]);
+  }
+  return g;
+}
+// Generischer Schritt-für-Schritt-Renderer für die neuen Werkzeuge.
+class StepRunner {
+  constructor(stepsId, nextId, helpId, onDone){
+    this.stepsEl=$(stepsId); this.nextBtn=$(nextId); this.helpChk=$(helpId);
+    this.onDone=onDone||null; this.groups=[]; this.shown=0;
+    this.nextBtn.onclick=()=>{ if(this.shown<this.groups.length){ this.shown++; this.render(); } };
+  }
+  run(steps){
+    this.groups=groupSteps(steps);
+    this.shown=this.helpChk.checked ? 0 : this.groups.length;
+    this.render();
+  }
+  render(){
+    const el=this.stepsEl; el.innerHTML="";
+    this.groups.slice(0,this.shown).flat().forEach(s=>{
+      const div=document.createElement("div");
+      div.className = s.kind==="head"?"s-head":s.kind==="mat"?"s-mat":s.kind==="res"?"s-res":"s-text";
+      if(s.kind==="head") div.textContent=s.text; else div.innerHTML=s.text;
+      el.appendChild(div);
+    });
+    typeset(el);
+    const n=this.groups.length, done=this.shown>=n;
+    this.nextBtn.disabled=done;
+    this.nextBtn.textContent = done? "Fertig ✓" : `Nächster Schritt (${this.shown}/${n})`;
+    if(done && this.onDone) this.onDone();
+  }
+}
+
+/* ---------- Modus-Umschalter ---------- */
+document.querySelectorAll("#topnav button").forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll("#topnav button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const mode=btn.dataset.mode;
+    $("mode-schnitt").classList.toggle("hidden", mode!=="schnitt");
+    $("mode-lage").classList.toggle("hidden", mode!=="lage");
+    $("mode-darst").classList.toggle("hidden", mode!=="darst");
+  };
+});
+
+/* ---------- Werkzeug 1: Ebenenschnitt (UI) ---------- */
 const keys=["P","a","b","Q","c","d"];
 // Hier kannst du deine drei festen Aufgaben/Preset-Werte vorab einstellen.
 // Jeder Vektor besteht aus drei Einträgen; Brüche als String wie "1/2" sind möglich.
@@ -327,15 +722,6 @@ function setEx(){
 
 const state={groups:[],shown:0,geo:null};
 
-// Eine Überschrift wird zusammen mit ihrem folgenden Erklärtext als ein Schritt aufgedeckt.
-function groupSteps(steps){
-  const g=[];
-  for(let i=0;i<steps.length;i++){
-    if(steps[i].kind==="head" && steps[i+1] && steps[i+1].kind==="text"){ g.push([steps[i],steps[i+1]]); i++; }
-    else g.push([steps[i]]);
-  }
-  return g;
-}
 function render(){
   const el=$("steps"); el.innerHTML="";
   const n=state.groups.length;
@@ -349,7 +735,7 @@ function render(){
   el.scrollTop=el.scrollHeight;
   const done=state.shown>=n;
   $("tab3d").classList.toggle("hidden", !done); // 3D-Tab erst am Ende
-  if(!done){ $("tab3d").classList.remove("active"); document.querySelector('.tab[data-tab="steps"]').classList.add("active");
+  if(!done){ $("tab3d").classList.remove("active"); document.querySelector('#mode-schnitt .tab[data-tab="steps"]').classList.add("active");
     $("steps").classList.remove("hidden"); $("view3d").classList.add("hidden"); }
   $("nextBtn").disabled=done;
   $("nextBtn").textContent = done? "Fertig ✓" : `Nächster Schritt (${state.shown}/${n})`;
@@ -373,8 +759,8 @@ document.querySelectorAll(".presetBtn").forEach(btn=>{
   btn.onclick=()=>loadPreset(Number(btn.dataset.preset));
 });
 
-document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
-  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+document.querySelectorAll('#mode-schnitt .tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('#mode-schnitt .tab').forEach(x=>x.classList.remove("active"));
   t.classList.add("active");
   const tab=t.dataset.tab;
   $("steps").classList.toggle("hidden", tab!=="steps");
@@ -382,7 +768,45 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(tab==="view3d") render();
 });
 
-/* ---------- 3D: drehbar ---------- */
+/* ---------- Werkzeug 2: Lagebeziehung (UI) ---------- */
+const lageRunner=new StepRunner("lbSteps","lbNext","lbHelp");
+function lbToggle(){
+  const eg = $("lbMode").value==="eg";
+  $("lb-eg").classList.toggle("hidden", !eg);
+  $("lb-ee").classList.toggle("hidden", eg);
+}
+$("lbMode").onchange=()=>{ lbToggle(); lageSolve(); };
+$("lbBtn").onclick=lageSolve;
+$("lbHelp").onchange=lageSolve;
+function setLageEx(){
+  ["lbE1a","lbE1b","lbE1c","lbE1d"].forEach((id,i)=>$(id).value=[1,1,1,1][i]);
+  ["lbE2a","lbE2b","lbE2c","lbE2d"].forEach((id,i)=>$(id).value=[1,-1,1,1][i]);
+  ["lbPa","lbPb","lbPc","lbPd"].forEach((id,i)=>$(id).value=[1,1,1,1][i]);
+  ["lbA0","lbA1","lbA2"].forEach((id,i)=>$(id).value=[0,0,0][i]);
+  ["lbU0","lbU1","lbU2"].forEach((id,i)=>$(id).value=[1,1,1][i]);
+}
+
+/* ---------- Werkzeug 3: Darstellungsformen (UI) ---------- */
+const darstRunner=new StepRunner("dfSteps","dfNext","dfHelp");
+function dfToggle(){
+  const f=$("dfForm").value;
+  $("df-param").classList.toggle("hidden", f!=="param");
+  $("df-normal").classList.toggle("hidden", f!=="normal");
+  $("df-koord").classList.toggle("hidden", f!=="koord");
+}
+$("dfForm").onchange=()=>{ dfToggle(); darstSolve(); };
+$("dfBtn").onclick=darstSolve;
+$("dfHelp").onchange=darstSolve;
+function setDarstEx(){
+  ["dfP0","dfP1","dfP2"].forEach((id,i)=>$(id).value=[1,2,0][i]);
+  ["dfU0","dfU1","dfU2"].forEach((id,i)=>$(id).value=[1,0,-1][i]);
+  ["dfV0","dfV1","dfV2"].forEach((id,i)=>$(id).value=[2,1,0][i]);
+  ["dfNP0","dfNP1","dfNP2"].forEach((id,i)=>$(id).value=[1,2,0][i]);
+  ["dfN0","dfN1","dfN2"].forEach((id,i)=>$(id).value=[1,-2,1][i]);
+  ["dfKa","dfKb","dfKc","dfKd"].forEach((id,i)=>$(id).value=[1,-2,1,-3][i]);
+}
+
+/* ---------- 3D: drehbar (Ebenenschnitt) ---------- */
 const cv=$("cv"), ctx=cv.getContext("2d");
 let yaw=-0.6, pitch=-0.5, zoom=1, geo3d=null;
 const norm=(v,L)=>{ const n=Math.hypot(...v)||1; return v.map(c=>c/n*L); };
@@ -483,7 +907,10 @@ cv.addEventListener("wheel",e=>{ e.preventDefault(); zoom*=Math.exp(-e.deltaY*0.
 window.addEventListener("resize",()=>{ if($("view3d").classList.contains("hidden")) return;
   geo3d?drawGeo():drawPlaceholder(); });
 
+/* ---------- Start ---------- */
 setEx();
+setLageEx(); lbToggle(); lageSolve();
+setDarstEx(); dfToggle(); darstSolve();
 </script>
 </body>
 </html>
