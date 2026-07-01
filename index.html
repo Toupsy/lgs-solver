@@ -157,8 +157,8 @@
         <input id="lbPa">·x +<input id="lbPb">·y +<input id="lbPc">·z =<input id="lbPd">
       </div>
       <div class="eq-title e2">Gerade g:  x = A + r·u</div>
-      <div class="vrow"><label>A (Stütze)</label><input id="lbA0"><input id="lbA1"><input id="lbA2"></div>
-      <div class="vrow"><label>u (Richtung)</label><input id="lbU0"><input id="lbU1"><input id="lbU2"></div>
+      <div class="vrow"><label>A (Stützvektor)</label><input id="lbA0"><input id="lbA1"><input id="lbA2"></div>
+      <div class="vrow"><label>u (Richtungsvektor)</label><input id="lbU0"><input id="lbU1"><input id="lbU2"></div>
     </div>
 
     <p class="hint">Ganze Zahlen oder Brüche wie 1/2 (Dezimal mit . oder , geht auch).</p>
@@ -197,14 +197,14 @@
     <div id="df-param">
       <div class="eq-title e1">x = P + s·u + t·v</div>
       <div class="vrow"><label>P (Aufpunkt)</label><input id="dfP0"><input id="dfP1"><input id="dfP2"></div>
-      <div class="vrow"><label>u (Spann 1)</label><input id="dfU0"><input id="dfU1"><input id="dfU2"></div>
-      <div class="vrow"><label>v (Spann 2)</label><input id="dfV0"><input id="dfV1"><input id="dfV2"></div>
+      <div class="vrow"><label>u (Spannvektor)</label><input id="dfU0"><input id="dfU1"><input id="dfU2"></div>
+      <div class="vrow"><label>v (Spannvektor)</label><input id="dfV0"><input id="dfV1"><input id="dfV2"></div>
     </div>
 
     <div id="df-normal" class="hidden">
       <div class="eq-title e1">(x − P) · n = 0</div>
       <div class="vrow"><label>P (Aufpunkt)</label><input id="dfNP0"><input id="dfNP1"><input id="dfNP2"></div>
-      <div class="vrow"><label>n (Normale)</label><input id="dfN0"><input id="dfN1"><input id="dfN2"></div>
+      <div class="vrow"><label>n (Normalenvektor)</label><input id="dfN0"><input id="dfN1"><input id="dfN2"></div>
     </div>
 
     <div id="df-koord" class="hidden">
@@ -521,7 +521,7 @@ function darstSolve(){
       add("head","Schritt 1 – Normalenform (Koordinatenform → Normalenform)");
       const pf=paramFromNormal(n,d); P=pf.P; u=pf.u; v=pf.v;
       add("text","Der Normalenvektor lässt sich direkt ablesen: \\(\\vec n = "+texVec(n)+"\\).\n"+
-        `Als Aufpunkt eine Koordinate frei wählen: setze die übrigen auf 0, dann folgt \\(P = ${texVec(P)}\\).\n`+
+        `Für einen Aufpunkt zwei Koordinaten auf 0 setzen und die dritte aus der Gleichung bestimmen: \\(P = ${texVec(P)}\\).\n`+
         `\\[\\left(\\vec x - ${texVec(P)}\\right)\\cdot ${texVec(n)} = 0\\]`);
       add("head","Schritt 2 – Parameterform (Koordinatenform → Parameterform)");
       add("text","Zwei Spannvektoren senkrecht zu \\(\\vec n\\) wählen (\\(\\vec n\\cdot\\vec u=0,\\ \\vec n\\cdot\\vec v=0\\)):\n"+
@@ -597,7 +597,7 @@ function lageSolve(){
         `\\[\\vec n_1 \\times \\vec n_2 = ${crossTex(n1,n2)} = ${texVec(cr)}\\]`);
 
       if(Vzero(cr)){
-        add("text","Das Kreuzprodukt ist der Nullvektor ⇒ \\(\\vec n_1\\) und \\(\\vec n_2\\) sind parallel, die Ebenen also parallel.");
+        add("text","Das Kreuzprodukt ist der Nullvektor ⇒ \\(\\vec n_1\\) und \\(\\vec n_2\\) sind kollinear (linear abhängig), die Ebenen also parallel.");
         add("head","Schritt 2 – identisch oder echt parallel?");
         const {P}=paramFromNormal(n1,d1);
         const lhs=Vdot(n2,P);
@@ -629,7 +629,7 @@ function lageSolve(){
           `${texLinComb([n2[i],n2[j]],[nm[i],nm[j]])} &= ${tex(d2)} \\end{aligned}\\]`+
           `\\[\\Rightarrow\\ ${nm[i]} = ${tex(xi)},\\quad ${nm[j]} = ${tex(xj)}\\quad\\Rightarrow\\quad P = ${texVec(Pt)}\\]`);
         add("head","Ergebnis");
-        add("res","Die Ebenen schneiden sich in einer Schnittgeraden.");
+        add("res","Die Ebenen schneiden sich in einer Geraden g.");
         add("text",`\\[g:\\ \\vec x = ${texVec(Pt)} + r\\,${texVec(dir)}\\]`);
       }
     }
