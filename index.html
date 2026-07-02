@@ -137,6 +137,7 @@
       <select id="lbMode">
         <option value="ee">Ebene &amp; Ebene</option>
         <option value="eg">Ebene &amp; Gerade</option>
+        <option value="gg">Gerade &amp; Gerade</option>
       </select>
     </div>
 
@@ -161,6 +162,15 @@
       <div class="vrow"><label>u (Richtungsvektor)</label><input id="lbU0"><input id="lbU1"><input id="lbU2"></div>
     </div>
 
+    <div id="lb-gg" class="hidden">
+      <div class="eq-title e1">Gerade g:  x = A + r·u</div>
+      <div class="vrow"><label>A (Stützvektor)</label><input id="lgA0"><input id="lgA1"><input id="lgA2"></div>
+      <div class="vrow"><label>u (Richtungsvektor)</label><input id="lgU0"><input id="lgU1"><input id="lgU2"></div>
+      <div class="eq-title e2">Gerade h:  x = B + s·w</div>
+      <div class="vrow"><label>B (Stützvektor)</label><input id="lgB0"><input id="lgB1"><input id="lgB2"></div>
+      <div class="vrow"><label>w (Richtungsvektor)</label><input id="lgW0"><input id="lgW1"><input id="lgW2"></div>
+    </div>
+
     <p class="hint">Ganze Zahlen oder Brüche wie 1/2 (Dezimal mit . oder , geht auch).</p>
     <div class="btns">
       <button class="primary" id="lbBtn">Bestimmen</button>
@@ -173,8 +183,15 @@
     </div>
   </div>
   <div class="panel right">
-    <div class="tabs"><div class="tab active">Rechenweg</div></div>
+    <div class="tabs">
+      <div class="tab active" data-tab="lbSteps">Rechenweg</div>
+      <div class="tab hidden" id="lbTab3d" data-tab="lbView3d">Koordinatensystem</div>
+    </div>
     <div id="lbSteps" class="steps"></div>
+    <div id="lbView3d" class="hidden">
+      <canvas id="lbCanvas" width="560" height="440"></canvas>
+      <div class="canvas-hint">Mit Maus ziehen (oder Finger wischen) zum Drehen. Scrollen/Pinch zum Zoomen.</div>
+    </div>
   </div>
 </div>
 
@@ -542,10 +559,17 @@ function darstSolve(){
 }
 
 /* ================= Lagebeziehung ================= */
+// Farben für das Koordinatensystem
+const COL_E1 = {fill:"rgba(74,144,217,.5)", stroke:"#1c5a96", legend:"#4a90d9"};
+const COL_E2 = {fill:"rgba(217,83,79,.5)",  stroke:"#9c2b27", legend:"#d9534f"};
+const COL_G  = "#1c5a96", COL_H = "#d9534f", COL_SCHNITT = "#1a7d33", COL_PKT = "#f0ad4e";
+
 function lageSolve(){
   const mode=$("lbMode").value;
   const steps=[]; const add=(k,t)=>steps.push({kind:k,text:t});
-  const fail=msg=>{ add("head","Eingabe prüfen"); add("text",msg); lageRunner.run(steps); };
+  const fl=v=>v.map(x=>x.num());
+  let geo=null; // Szene fürs Koordinatensystem
+  const fail=msg=>{ add("head","Eingabe prüfen"); add("text",msg); lageGeo=null; lageRunner.run(steps); };
 
   try{
     if(mode==="eg"){ /* ----- Ebene & Gerade ----- */
@@ -565,6 +589,12 @@ function lageSolve(){
       add("text",`\\[\\underbrace{\\vec n\\cdot\\vec A}_{=\\,${tex(nA)}} + \\underbrace{(\\vec n\\cdot\\vec u)}_{=\\,${tex(nu)}}\\,r = ${tex(d)}\\]`+
         `\\[${tex(nA)} + ${tex(nu)}\\,r = ${tex(d)}\\]`);
 
+      // Basis-Szene: Ebene + Gerade
+      const plane={kind:"plane", n:fl(n), d:d.num(), fill:COL_E1.fill, stroke:COL_E1.stroke};
+      const line ={kind:"line",  p:fl(A), dir:fl(u), color:COL_H, width:5};
+      geo={objs:[plane,line], anchors:[fl(A)],
+           legend:[[COL_E1.legend,"Ebene E"],[COL_H,"Gerade g"]]};
+
       add("head","Ergebnis");
       if(!nu.isZero()){
         const r=d.sub(nA).div(nu);
@@ -574,13 +604,90 @@ function lageSolve(){
           `Einsetzen in \\(g\\) liefert den Schnittpunkt.`);
         add("res",`Die Gerade schneidet die Ebene in genau einem Punkt.`);
         add("text",`\\[S = ${texVec(A)} + ${par(r)}\\cdot ${texVec(u)} = ${texVec(S)}\\]`);
+        geo.objs.push({kind:"point", p:fl(S), color:COL_PKT});
+        geo.anchors.push(fl(S));
+        geo.legend.push([COL_PKT,"Schnittpunkt S"]);
       } else if(nA.eq(d)){
         add("text",`Es ist \\(\\vec n\\cdot\\vec u = 0\\) (die Gerade verläuft parallel zur Ebene) und die Gleichung `+
           `\\(${tex(nA)} = ${tex(d)}\\) ist für jedes \\(r\\) erfüllt.`);
         add("res","Die Gerade liegt vollständig in der Ebene (unendlich viele gemeinsame Punkte).");
+        geo.legend.push([COL_H,"Gerade liegt in E"]);
       } else {
         add("text",`Es ist \\(\\vec n\\cdot\\vec u = 0\\), aber \\(${tex(nA)} \\neq ${tex(d)}\\) – die Gleichung hat keine Lösung.`);
         add("res","Die Gerade ist echt parallel zur Ebene (kein gemeinsamer Punkt).");
+        geo.legend.push(["#888","echt parallel"]);
+      }
+    }
+    else if(mode==="gg"){ /* ----- Gerade & Gerade ----- */
+      const A=rv(["lgA0","lgA1","lgA2"]), u=rv(["lgU0","lgU1","lgU2"]);
+      const B=rv(["lgB0","lgB1","lgB2"]), w=rv(["lgW0","lgW1","lgW2"]);
+      if(Vzero(u)||Vzero(w)){ return fail("Beide Geraden brauchen einen Richtungsvektor ≠ 0."); }
+
+      add("head","Gegeben");
+      add("text",`\\[g:\\ \\vec x = ${texVec(A)} + r\\,${texVec(u)} \\qquad h:\\ \\vec x = ${texVec(B)} + s\\,${texVec(w)}\\]`);
+      add("head","Schritt 1 – Richtungsvektoren vergleichen");
+      const cr=Vcross(u,w);
+      add("text","Sind die Richtungsvektoren \\(\\vec u\\) und \\(\\vec w\\) parallel? Test über das Kreuzprodukt:\n"+
+        `\\[\\vec u \\times \\vec w = ${crossTex(u,w)} = ${texVec(cr)}\\]`);
+
+      // Basis-Szene: zwei Geraden
+      const lineG={kind:"line", p:fl(A), dir:fl(u), color:COL_G, width:5};
+      const lineH={kind:"line", p:fl(B), dir:fl(w), color:COL_H, width:5};
+      geo={objs:[lineG,lineH], anchors:[fl(A),fl(B)],
+           legend:[[COL_G,"Gerade g"],[COL_H,"Gerade h"]]};
+
+      const AB=Vsub(B,A);
+      if(Vzero(cr)){
+        add("text","Das Kreuzprodukt ist der Nullvektor ⇒ \\(\\vec u\\) und \\(\\vec w\\) sind parallel.");
+        add("head","Schritt 2 – identisch oder echt parallel?");
+        const cr2=Vcross(AB,u);
+        add("text",`Liegt der Aufpunkt \\(B\\) von \\(h\\) auf \\(g\\)? Wir prüfen, ob \\(\\vec{AB}=\\vec B-\\vec A=${texVec(AB)}\\) parallel zu \\(\\vec u\\) ist:\n`+
+          `\\[\\vec{AB}\\times\\vec u = ${crossTex(AB,u)} = ${texVec(cr2)}\\]`);
+        add("head","Ergebnis");
+        if(Vzero(AB)||Vzero(cr2)){
+          add("text","Das Kreuzprodukt ist der Nullvektor ⇒ \\(B\\) liegt auf \\(g\\).");
+          add("res","Die Geraden sind identisch (sie fallen zusammen).");
+          geo.legend.push([COL_SCHNITT,"Geraden identisch"]);
+        } else {
+          add("text",`Das Kreuzprodukt ist nicht der Nullvektor ⇒ \\(B\\) liegt nicht auf \\(g\\).`);
+          add("res","Die Geraden sind echt parallel (kein gemeinsamer Punkt).");
+          geo.legend.push(["#888","echt parallel"]);
+        }
+      } else {
+        add("text","Das Kreuzprodukt ist nicht der Nullvektor ⇒ \\(\\vec u\\) und \\(\\vec w\\) sind nicht parallel.");
+        add("head","Schritt 2 – schneidend oder windschief?");
+        const box=Vdot(AB,cr);
+        add("text","Schneiden sich die Geraden, so liegen \\(\\vec{AB}=\\vec B-\\vec A\\), \\(\\vec u\\) und \\(\\vec w\\) in einer Ebene. "+
+          "Test über das Spatprodukt:\n"+
+          `\\[\\left(\\vec B-\\vec A\\right)\\cdot(\\vec u\\times\\vec w) = ${dotTex(AB,cr)} = ${tex(box)}\\]`);
+        add("head","Ergebnis");
+        if(!box.isZero()){
+          add("text",`Das Spatprodukt ist \\(${tex(box)}\\neq 0\\) ⇒ die drei Vektoren spannen einen Körper auf, es gibt keinen Schnittpunkt.`);
+          add("res","Die Geraden sind windschief (nicht parallel und ohne gemeinsamen Punkt).");
+          geo.legend.push(["#888","windschief"]);
+        } else {
+          add("text","Das Spatprodukt ist \\(0\\) ⇒ die Geraden liegen in einer Ebene und schneiden sich.");
+          add("head","Schritt 3 – Schnittpunkt bestimmen");
+          // Aus g = h: r·u − s·w = B − A. Zwei Gleichungen mit ≠0-Determinante wählen.
+          const nm=["x","y","z"]; let ii=-1,jj=-1,det=F0;
+          for(const [i,j] of [[0,1],[0,2],[1,2]]){
+            const dd=u[i].mul(w[j]).sub(u[j].mul(w[i]));
+            if(!dd.isZero()){ ii=i; jj=j; det=dd; break; }
+          }
+          // r = (AB_i·w_j − AB_j·w_i)/det
+          const r=AB[ii].mul(w[jj]).sub(AB[jj].mul(w[ii])).div(det);
+          const S=Vadd(A,Vscale(u,r));
+          add("text",`Aus \\(\\vec A + r\\,\\vec u = \\vec B + s\\,\\vec w\\) folgt \\(r\\,\\vec u - s\\,\\vec w = \\vec B-\\vec A\\). `+
+            `Die Zeilen \\(${nm[ii]}\\) und \\(${nm[jj]}\\) liefern:\n`+
+            `\\[\\begin{aligned} ${texLinComb([u[ii],w[ii].neg()],["r","s"])} &= ${tex(AB[ii])} \\\\ `+
+            `${texLinComb([u[jj],w[jj].neg()],["r","s"])} &= ${tex(AB[jj])} \\end{aligned}\\]`+
+            `\\[\\Rightarrow\\ r = ${tex(r)}\\]`);
+          add("res","Die Geraden schneiden sich in genau einem Punkt.");
+          add("text",`\\[S = ${texVec(A)} + ${par(r)}\\cdot ${texVec(u)} = ${texVec(S)}\\]`);
+          geo.objs.push({kind:"point", p:fl(S), color:COL_PKT});
+          geo.anchors.push(fl(S));
+          geo.legend.push([COL_PKT,"Schnittpunkt S"]);
+        }
       }
     }
     else { /* ----- Ebene & Ebene ----- */
@@ -596,6 +703,15 @@ function lageSolve(){
       add("text","Sind die Normalenvektoren parallel? Test über das Kreuzprodukt:\n"+
         `\\[\\vec n_1 \\times \\vec n_2 = ${crossTex(n1,n2)} = ${texVec(cr)}\\]`);
 
+      // Basis-Szene: zwei Ebenen
+      const {P:P1}=paramFromNormal(n1,d1), {P:P2}=paramFromNormal(n2,d2);
+      geo={objs:[
+             {kind:"plane", n:fl(n1), d:d1.num(), fill:COL_E1.fill, stroke:COL_E1.stroke},
+             {kind:"plane", n:fl(n2), d:d2.num(), fill:COL_E2.fill, stroke:COL_E2.stroke}
+           ],
+           anchors:[fl(P1),fl(P2)],
+           legend:[[COL_E1.legend,"Ebene E1"],[COL_E2.legend,"Ebene E2"]]};
+
       if(Vzero(cr)){
         add("text","Das Kreuzprodukt ist der Nullvektor ⇒ \\(\\vec n_1\\) und \\(\\vec n_2\\) sind kollinear (linear abhängig), die Ebenen also parallel.");
         add("head","Schritt 2 – identisch oder echt parallel?");
@@ -606,8 +722,10 @@ function lageSolve(){
         add("head","Ergebnis");
         if(lhs.eq(d2)){
           add("res","Die Ebenen sind identisch (sie fallen zusammen).");
+          geo.legend.push([COL_SCHNITT,"Ebenen identisch"]);
         } else {
           add("res","Die Ebenen sind echt parallel (kein gemeinsamer Punkt, Abstand > 0).");
+          geo.legend.push(["#888","echt parallel"]);
         }
       } else {
         add("text","Das Kreuzprodukt ist nicht der Nullvektor ⇒ die Ebenen schneiden sich in einer Geraden.");
@@ -631,9 +749,13 @@ function lageSolve(){
         add("head","Ergebnis");
         add("res","Die Ebenen schneiden sich in einer Geraden g.");
         add("text",`\\[g:\\ \\vec x = ${texVec(Pt)} + r\\,${texVec(dir)}\\]`);
+        geo.objs.push({kind:"line", p:fl(Pt), dir:fl(dir), color:COL_SCHNITT, width:5});
+        geo.anchors.push(fl(Pt));
+        geo.legend.push([COL_SCHNITT,"Schnittgerade g"]);
       }
     }
   } catch(e){ return fail("Bitte alle Felder ausfüllen (z.B. 1, -2, 1/2)."); }
+  lageGeo=geo;
   lageRunner.run(steps);
 }
 
@@ -659,9 +781,9 @@ function groupSteps(steps){
 }
 // Generischer Schritt-für-Schritt-Renderer für die neuen Werkzeuge.
 class StepRunner {
-  constructor(stepsId, nextId, helpId, onDone){
+  constructor(stepsId, nextId, helpId, opts){
     this.stepsEl=$(stepsId); this.nextBtn=$(nextId); this.helpChk=$(helpId);
-    this.onDone=onDone||null; this.groups=[]; this.shown=0;
+    this.opts=opts||{}; this.groups=[]; this.shown=0;
     this.nextBtn.onclick=()=>{ if(this.shown<this.groups.length){ this.shown++; this.render(); } };
   }
   run(steps){
@@ -681,7 +803,8 @@ class StepRunner {
     const n=this.groups.length, done=this.shown>=n;
     this.nextBtn.disabled=done;
     this.nextBtn.textContent = done? "Fertig ✓" : `Nächster Schritt (${this.shown}/${n})`;
-    if(done && this.onDone) this.onDone();
+    if(this.opts.onProgress) this.opts.onProgress(done);
+    if(done && this.opts.onDone) this.opts.onDone();
   }
 }
 
@@ -768,12 +891,152 @@ document.querySelectorAll('#mode-schnitt .tab').forEach(t=>t.onclick=()=>{
   if(tab==="view3d") render();
 });
 
+/* ---------- Allgemeiner 3D-Szenen-Renderer (Lagebeziehung) ---------- */
+// Numerische Vektor-Helfer (arbeiten mit gewöhnlichen Zahlen, nicht mit Frac)
+const ncross=(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const nnorm =(v,L)=>{ const n=Math.hypot(v[0],v[1],v[2])||1; return v.map(c=>c/n*L); };
+// Punkt der Ebene (n·x=d), der C am nächsten liegt
+function planeCenter(n,d,C){
+  const nn=n[0]*n[0]+n[1]*n[1]+n[2]*n[2]||1;
+  const t=(n[0]*C[0]+n[1]*C[1]+n[2]*C[2]-d)/nn;
+  return [C[0]-t*n[0], C[1]-t*n[1], C[2]-t*n[2]];
+}
+// Zwei Richtungen, die die Ebene mit Normale n aufspannen
+function planeBasis(n){
+  let t=[1,0,0];
+  if(Math.abs(n[0])>=Math.abs(n[1]) && Math.abs(n[0])>=Math.abs(n[2])) t=[0,1,0];
+  const u=ncross(n,t), v=ncross(n,u);
+  return [u,v];
+}
+// Punkt der Geraden (p+t·dir), der C am nächsten liegt
+function lineCenter(p,dir,C){
+  const dd=dir[0]*dir[0]+dir[1]*dir[1]+dir[2]*dir[2]||1;
+  const t=((C[0]-p[0])*dir[0]+(C[1]-p[1])*dir[1]+(C[2]-p[2])*dir[2])/dd;
+  return [p[0]+t*dir[0], p[1]+t*dir[1], p[2]+t*dir[2]];
+}
+
+class Scene3D {
+  constructor(canvas){
+    this.cv=canvas; this.ctx=canvas.getContext("2d");
+    this.yaw=-0.6; this.pitch=-0.5; this.zoom=1; this.scene=null; this.drag=null;
+    canvas.addEventListener("pointerdown",e=>{ this.drag={x:e.clientX,y:e.clientY};
+      canvas.classList.add("grabbing"); canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove",e=>{ if(!this.drag) return;
+      this.yaw += (e.clientX-this.drag.x)*0.01; this.pitch += (e.clientY-this.drag.y)*0.01;
+      this.pitch=Math.max(-1.5,Math.min(1.5,this.pitch)); this.drag={x:e.clientX,y:e.clientY};
+      this.draw(); });
+    canvas.addEventListener("pointerup",()=>{ this.drag=null; canvas.classList.remove("grabbing"); });
+    canvas.addEventListener("wheel",e=>{ e.preventDefault(); this.zoom*=Math.exp(-e.deltaY*0.001);
+      this.zoom=Math.max(0.3,Math.min(4,this.zoom)); this.draw(); }, {passive:false});
+    window.addEventListener("resize",()=>{ if(this.cv.offsetParent===null) return; this.draw(); });
+  }
+  setScene(s){ this.scene=s; }
+  fit(){
+    const r=this.cv.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+    this.cv.width=r.width*dpr; this.cv.height=r.height*dpr;
+    this.ctx.setTransform(dpr,0,0,dpr,0,0); this.cv._w=r.width; this.cv._h=r.height;
+  }
+  rot(p){
+    const [x,y,z]=p, ca=Math.cos(this.yaw),sa=Math.sin(this.yaw);
+    const x1=x*ca+z*sa, z1=-x*sa+z*ca, y1=y;
+    const cb=Math.cos(this.pitch),sb=Math.sin(this.pitch);
+    return [x1, y1*cb - z1*sb, y1*sb + z1*cb];
+  }
+  draw(){
+    this.fit();
+    const ctx=this.ctx, W=this.cv._w, H=this.cv._h;
+    ctx.clearRect(0,0,W,H);
+    const sc=this.scene;
+    if(!sc || !sc.objs){
+      ctx.fillStyle="#999"; ctx.font="15px Segoe UI"; ctx.textAlign="center";
+      ctx.fillText("Koordinatensystem erscheint, sobald alle Schritte aufgedeckt sind.", W/2, H/2);
+      return;
+    }
+    const S=4, LEXT=5.5;
+    const anchors=(sc.anchors && sc.anchors.length)?sc.anchors:[[0,0,0]];
+    const ctr=[0,1,2].map(k=>anchors.reduce((s,p)=>s+p[k],0)/anchors.length);
+    const prim=[], allPts=[];
+    for(const o of sc.objs){
+      if(o.kind==="plane"){
+        const c=planeCenter(o.n,o.d,ctr), [bu,bv]=planeBasis(o.n);
+        const u=nnorm(bu,S), v=nnorm(bv,S);
+        const poly=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([i,j])=>c.map((_,k)=>c[k]+i*u[k]+j*v[k]));
+        prim.push({type:"plane",poly,fill:o.fill,stroke:o.stroke}); allPts.push(...poly);
+      } else if(o.kind==="line"){
+        const c=lineCenter(o.p,o.dir,ctr), dn=nnorm(o.dir,LEXT);
+        const seg=[c.map((_,k)=>c[k]-dn[k]), c.map((_,k)=>c[k]+dn[k])];
+        prim.push({type:"line",seg,color:o.color,width:o.width||4}); allPts.push(...seg);
+      } else if(o.kind==="point"){
+        prim.push({type:"point",p:o.p,color:o.color}); allPts.push(o.p);
+      }
+    }
+    const R=p=>this.rot([p[0]-ctr[0],p[1]-ctr[1],p[2]-ctr[2]]);
+    const rp=allPts.map(R);
+    const xs=rp.map(p=>p[0]), ys=rp.map(p=>-p[1]);
+    const minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
+    const m=34, k=Math.min((W-2*m)/((maxx-minx)||1),(H-2*m)/((maxy-miny)||1))*this.zoom;
+    const cx=W/2, cy=H/2, mx=(minx+maxx)/2, my=(miny+maxy)/2;
+    const proj=p=>{ const q=R(p); return [cx+(q[0]-mx)*k, cy+(-q[1]-my)*k]; };
+    // Ebenen von hinten nach vorne
+    const planes=prim.filter(o=>o.type==="plane");
+    const meanZ=poly=>poly.reduce((s,p)=>s+R(p)[2],0)/poly.length;
+    planes.sort((A,B)=>meanZ(B.poly)-meanZ(A.poly));
+    for(const pl of planes){
+      ctx.beginPath();
+      pl.poly.forEach((p,i)=>{ const [x,y]=proj(p); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+      ctx.closePath(); ctx.fillStyle=pl.fill; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle=pl.stroke; ctx.stroke();
+    }
+    for(const ln of prim.filter(o=>o.type==="line")){
+      const [x1,y1]=proj(ln.seg[0]), [x2,y2]=proj(ln.seg[1]);
+      ctx.lineCap="round";
+      ctx.strokeStyle="#fff"; ctx.lineWidth=ln.width+3; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      ctx.strokeStyle=ln.color; ctx.lineWidth=ln.width; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    }
+    for(const pt of prim.filter(o=>o.type==="point")){
+      const [x,y]=proj(pt.p);
+      ctx.fillStyle=pt.color; ctx.beginPath(); ctx.arc(x,y,7,0,7); ctx.fill();
+      ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke();
+    }
+    ctx.textAlign="left"; ctx.font="13px Segoe UI";
+    (sc.legend||[]).forEach(([col,lab],i)=>{ const y=14+i*20;
+      ctx.fillStyle=col; ctx.fillRect(12,y,16,12);
+      ctx.fillStyle="#222"; ctx.fillText(lab,34,y+11); });
+  }
+}
+
 /* ---------- Werkzeug 2: Lagebeziehung (UI) ---------- */
-const lageRunner=new StepRunner("lbSteps","lbNext","lbHelp");
+let lageGeo=null;
+const lageScene=new Scene3D($("lbCanvas"));
+// Koordinatensystem-Tab erst zeigen, wenn alle Schritte aufgedeckt sind (wie beim Ebenenschnitt).
+const lageRunner=new StepRunner("lbSteps","lbNext","lbHelp",{
+  onProgress:(done)=>{
+    $("lbTab3d").classList.toggle("hidden", !done);
+    if(!done){
+      $("lbTab3d").classList.remove("active");
+      document.querySelector('#mode-lage .tab[data-tab="lbSteps"]').classList.add("active");
+      $("lbSteps").classList.remove("hidden"); $("lbView3d").classList.add("hidden");
+    }
+  },
+  onDone:()=>{
+    lageScene.setScene(lageGeo);
+    if(!$("lbView3d").classList.contains("hidden")) lageScene.draw();
+  }
+});
+document.querySelectorAll('#mode-lage .tab').forEach(t=>t.onclick=()=>{
+  if(t.classList.contains("hidden")) return;
+  document.querySelectorAll('#mode-lage .tab').forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  const tab=t.dataset.tab;
+  $("lbSteps").classList.toggle("hidden", tab!=="lbSteps");
+  $("lbView3d").classList.toggle("hidden", tab!=="lbView3d");
+  if(tab==="lbView3d") lageScene.draw();
+});
 function lbToggle(){
-  const eg = $("lbMode").value==="eg";
-  $("lb-eg").classList.toggle("hidden", !eg);
-  $("lb-ee").classList.toggle("hidden", eg);
+  const m=$("lbMode").value;
+  $("lb-ee").classList.toggle("hidden", m!=="ee");
+  $("lb-eg").classList.toggle("hidden", m!=="eg");
+  $("lb-gg").classList.toggle("hidden", m!=="gg");
 }
 $("lbMode").onchange=()=>{ lbToggle(); lageSolve(); };
 $("lbBtn").onclick=lageSolve;
@@ -784,6 +1047,10 @@ function setLageEx(){
   ["lbPa","lbPb","lbPc","lbPd"].forEach((id,i)=>$(id).value=[1,1,1,1][i]);
   ["lbA0","lbA1","lbA2"].forEach((id,i)=>$(id).value=[0,0,0][i]);
   ["lbU0","lbU1","lbU2"].forEach((id,i)=>$(id).value=[1,1,1][i]);
+  ["lgA0","lgA1","lgA2"].forEach((id,i)=>$(id).value=[1,0,0][i]);
+  ["lgU0","lgU1","lgU2"].forEach((id,i)=>$(id).value=[1,1,0][i]);
+  ["lgB0","lgB1","lgB2"].forEach((id,i)=>$(id).value=[0,0,2][i]);
+  ["lgW0","lgW1","lgW2"].forEach((id,i)=>$(id).value=[0,1,1][i]);
 }
 
 /* ---------- Werkzeug 3: Darstellungsformen (UI) ---------- */
