@@ -27,6 +27,12 @@ Bestimmt die gegenseitige Lage – als Hilfestellung mit erklärtem Rechenweg.
 - **Ebene & Gerade** (Ebene in Koordinatenform, Gerade in Parameterform): Gerade
   in die Ebenengleichung einsetzen → Schnittpunkt (genau eine Lösung), Gerade
   liegt in der Ebene oder echt parallel.
+- **Gerade & Gerade** (beide in Parameterform): Richtungsvektoren über das
+  Kreuzprodukt vergleichen und mit dem Spatprodukt prüfen → identisch, echt
+  parallel, schneidend (mit Schnittpunkt) oder windschief.
+- **Koordinatensystem:** Sobald alle Rechenschritte aufgedeckt sind, erscheint
+  für jeden Fall eine drehbare 3D-Ansicht (Ebenen, Geraden, Schnittgerade bzw.
+  Schnittpunkt) – mit Maus oder Finger drehbar, Zoom per Scrollen/Pinch.
 
 ## Werkzeug 3 – Darstellungsformen
 Zeigt systematisch, wie man zwischen den Formen einer Ebenengleichung wechselt:
